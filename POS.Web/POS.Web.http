@@ -1,0 +1,6 @@
+@POS.Web_HostAddress = http://localhost:5058
+
+GET {{POS.Web_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

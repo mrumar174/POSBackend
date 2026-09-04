@@ -1,0 +1,43 @@
+# Visual Studio / .NET
+bin/
+obj/
+*.user
+*.suo
+*.pdb
+*.cache
+*.tmp
+*.log
+*.pidb
+*.userprefs
+*.dbmdl
+*.jfm
+.vs/
+packages/
+*.nupkg.metadata
+*.nupkg
+*.nuspec
+*.nuspec
+*.snk
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+build/
+bld/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# SQL Server files
+*.mdf
+*.ldf
+*.ndf

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="POS.DTOs/POS.DTOs.csproj" />
+  <Project Path="POS.Entities/POS.Entities.csproj" />
+  <Project Path="POS.Web/POS.Web.csproj" />
+</Solution>
