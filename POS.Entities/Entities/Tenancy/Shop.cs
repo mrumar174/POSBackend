@@ -11,7 +11,7 @@ namespace POS.Entities.Tenancy
     public class Shop : TenantAuditableEntity
     {
         public string Code { get; set; } = default!;      // SHOP-00001
-        public string Name { get; set; } = default!;       // "Main Branch", "Gulberg Outlet"
+        public string Name { get; set; } = default!;
         public string? Address { get; set; }
         public string? City { get; set; }
         public string? ContactNo { get; set; }
