@@ -9,7 +9,7 @@ namespace POS.Web.Controllers
     // "SuperAdmin" role/policy, lock GetAll/Update/Delete down with it —
     // right now any authenticated user from any tenant can call them.
     [ApiController]
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     public class TenantsController : ControllerBase
     {

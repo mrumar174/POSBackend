@@ -12,7 +12,7 @@ namespace POS.Web.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize] // requires a valid JWT — ICurrentUserService reads TenantId/ShopId from it
+    [Authorize] // requires a valid JWT — ICurrentUserService reads TenantId/ShopId from it
     public class CategoriesController : ControllerBase
     {
         private readonly ICategoryService _categoryService;
