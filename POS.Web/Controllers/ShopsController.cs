@@ -6,7 +6,7 @@ using POS.Entities.IServices;
 namespace POS.Web.Controllers
 {
     [ApiController]
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     public class ShopsController : ControllerBase
     {
