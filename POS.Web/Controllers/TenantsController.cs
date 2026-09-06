@@ -9,7 +9,7 @@ namespace POS.Web.Controllers
     // "SuperAdmin" role/policy, lock GetAll/Update/Delete down with it —
     // right now any authenticated user from any tenant can call them.
     [ApiController]
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     public class TenantsController : ControllerBase
     {
@@ -42,7 +42,6 @@ namespace POS.Web.Controllers
         [HttpGet("{id:int}")]
         public async Task<ActionResult<TenantDto>> GetById(int id)
         {
-            var password = BCrypt.Net.BCrypt.HashPassword("123456");
             var tenant = await _tenantService.GetByIdAsync(id);
             return tenant is null ? NotFound() : Ok(tenant);
         }

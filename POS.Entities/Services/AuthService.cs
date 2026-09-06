@@ -31,6 +31,7 @@ namespace POS.Entities.Services
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
             var user = await _db.Users
+                .IgnoreQueryFilters()
                 .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
                     .ThenInclude(r => r.RolePermissions).ThenInclude(rp => rp.Permission)
                 .Include(u => u.UserShops)
@@ -38,10 +39,11 @@ namespace POS.Entities.Services
                     u.TenantId == dto.TenantId &&
                     u.UserName.ToLower() == dto.UserName.ToLower());
 
-            // Same message for "no such user" and "wrong password" —
-            // don't let the client enumerate valid usernames.
-            if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-                throw new UnauthorizedAccessException("Invalid username or password.");
+            if (user is null)
+                throw new UnauthorizedAccessException("Invalid username.");
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+                throw new UnauthorizedAccessException("Invalid password.");
 
             if (!user.UserShops.Any())
                 throw new UnauthorizedAccessException("This user is not assigned to any shop.");
@@ -76,7 +78,6 @@ namespace POS.Entities.Services
                 User = _mapper.Map<UserDto>(user)
             };
         }
-
         private (string token, DateTime expiresAtUtc) GenerateToken(
             int userId, int tenantId, int shopId, string userName,
             IEnumerable<string> roles, IEnumerable<string> permissions)
