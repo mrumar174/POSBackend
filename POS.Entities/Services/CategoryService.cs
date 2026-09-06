@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using POS.DTOs.Catalog;
 using POS.Entities.Catalog;
+using POS.Entities.Common;
 using POS.Entities.Data;
 using POS.Entities.IServices;
 
@@ -11,11 +12,15 @@ namespace POS.Entities.Services
     {
         private readonly ApplicationDbContext _db;
         private readonly IMapper _mapper;
+        private readonly ICurrentUserService _currentUser;
 
-        public CategoryService(ApplicationDbContext db, IMapper mapper)
+        public CategoryService(ApplicationDbContext db,
+            ICurrentUserService currentUser,
+            IMapper mapper)
         {
             _db = db;
             _mapper = mapper;
+            _currentUser = currentUser;
         }
 
         // No .Where(TenantId == ...) anywhere in this class — the global query
@@ -23,7 +28,10 @@ namespace POS.Entities.Services
         // caller's tenant. That's the whole point of the multi-shop setup.
         public async Task<List<CategoryDto>> GetAllAsync()
         {
+            var tenantId = _currentUser.TenantId;
+
             var categories = await _db.Categories
+                .Where(x => x.TenantId == _currentUser.TenantId)
                 .OrderBy(c => c.Name)
                 .ToListAsync();
 

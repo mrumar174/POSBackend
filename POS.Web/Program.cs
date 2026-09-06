@@ -94,6 +94,12 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngularDev", policy =>
+        policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod());
+});
+
 var app = builder.Build();
 
 // ---------------------------------------------------------------
@@ -107,7 +113,7 @@ app.UseSwaggerUI(options =>
 });
 
 app.UseHttpsRedirection();
-
+app.UseCors("AllowAngularDev");
 app.UseAuthentication(); // must run before UseAuthorization — ICurrentUserService depends on this populating HttpContext.User
 app.UseAuthorization();
 
