@@ -1,5 +1,5 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -8,6 +8,7 @@ using POS.Entities.Data;
 using POS.Entities.IServices;
 using POS.Entities.Services;
 using POS.Web.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -99,7 +100,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAngularDev", policy =>
         policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod());
 });
-
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, POS.Web.Authorization.PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, POS.Web.Authorization.PermissionAuthorizationHandler>();
 var app = builder.Build();
 
 // ---------------------------------------------------------------

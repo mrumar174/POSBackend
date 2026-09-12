@@ -2,13 +2,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Catalog;
 using POS.Entities.IServices;
+using POS.Web.Authorization;
 
 namespace POS.Web.Controllers
 {
     /// <summary>
     /// Reference pattern for every other simple master-data controller
     /// (Brands, Units, PaymentMethods, ExpenseCategories, Suppliers, ...) —
-    /// copy this file and swap Category -> the entity name.
+    /// copy this file and swap Category -> the entity name, and swap the
+    /// "Categories.X" permission strings below for "YourEntity.X".
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
@@ -22,7 +24,7 @@ namespace POS.Web.Controllers
             _categoryService = categoryService;
         }
 
-        /// <summary>GET /api/categories</summary>
+        /// <summary>GET /api/categories — any authenticated user can view.</summary>
         [HttpGet]
         [ProducesResponseType(typeof(List<CategoryDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAll()
@@ -31,7 +33,7 @@ namespace POS.Web.Controllers
             return Ok(categories);
         }
 
-        /// <summary>GET /api/categories/5</summary>
+        /// <summary>GET /api/categories/5 — any authenticated user can view.</summary>
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -41,10 +43,12 @@ namespace POS.Web.Controllers
             return category is null ? NotFound() : Ok(category);
         }
 
-        /// <summary>POST /api/categories</summary>
+        /// <summary>POST /api/categories — requires Categories.Create.</summary>
+        [RequirePermission("Categories.Create")]
         [HttpPost]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Create([FromBody] CreateCategoryDto dto)
         {
             try
@@ -58,11 +62,13 @@ namespace POS.Web.Controllers
             }
         }
 
-        /// <summary>PUT /api/categories/5</summary>
+        /// <summary>PUT /api/categories/5 — requires Categories.Edit.</summary>
+        [RequirePermission("Categories.Edit")]
         [HttpPut("{id:int}")]
         [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCategoryDto dto)
         {
             if (id != dto.Id)
@@ -83,11 +89,13 @@ namespace POS.Web.Controllers
             }
         }
 
-        /// <summary>DELETE /api/categories/5</summary>
+        /// <summary>DELETE /api/categories/5 — requires Categories.Delete.</summary>
+        [RequirePermission("Categories.Delete")]
         [HttpDelete("{id:int}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> Delete(int id)
         {
             try
