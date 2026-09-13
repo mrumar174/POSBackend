@@ -11,9 +11,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using POS.Entities.IServices;
+using POS.Entities.IServices.Identity;
 
-namespace POS.Entities.Services
+namespace POS.Entities.Services.Identity
 {
     public class UserService : IUserService
     {

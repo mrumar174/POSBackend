@@ -1,6 +1,6 @@
 ﻿using POS.DTOs.Identity;
 
-namespace POS.Entities.IServices
+namespace POS.Entities.IServices.Identity
 {
     public interface IUserService
     {

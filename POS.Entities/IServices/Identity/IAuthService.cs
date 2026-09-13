@@ -1,6 +1,6 @@
 ﻿using POS.DTOs.Auth;
 
-namespace POS.Entities.IServices
+namespace POS.Entities.IServices.Identity
 {
     public interface IAuthService
     {

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using POS.DTOs.Tenancy;
 using POS.Entities.Common;
 using POS.Entities.Data;
-using POS.Entities.IServices;
+using POS.Entities.IServices.Tenancy;
 using POS.Entities.Tenancy;
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace POS.Entities.Services
+namespace POS.Entities.Services.Temancy
 {
     public class ShopService : IShopService
     {
