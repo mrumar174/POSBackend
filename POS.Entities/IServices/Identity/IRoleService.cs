@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace POS.Entities.IServices
+namespace POS.Entities.IServices.Identity
 {
     public interface IRoleService
     {

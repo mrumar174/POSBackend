@@ -1,6 +1,6 @@
 ﻿using POS.DTOs.Tenancy;
 
-namespace POS.Entities.IServices
+namespace POS.Entities.IServices.Tenancy
 {
     public interface ITenantService
     {

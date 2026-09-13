@@ -2,6 +2,7 @@
 using POS.DTOs.Tenancy;
 using POS.Entities.Common;
 using POS.Entities.Data;
+using POS.Entities.IServices.Tenancy;
 using POS.Entities.Tenancy;
 using System;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace POS.Entities.IServices
+namespace POS.Entities.Services.Temancy
 {
     public class TenantService : ITenantService
     {
@@ -37,13 +38,13 @@ namespace POS.Entities.IServices
                 Address = t.Address,
                 City = t.City,
                 Slug = t.Slug,
-                SubscriptionStatus = (POS.DTOs.Common.SubscriptionStatus)(int)t.SubscriptionStatus,
+                SubscriptionStatus = (DTOs.Common.SubscriptionStatus)(int)t.SubscriptionStatus,
                 SubscriptionPlanCode = t.SubscriptionPlanCode,
                 SubscriptionStartDate = t.SubscriptionStartDate,
                 SubscriptionEndDate = t.SubscriptionEndDate,
                 MaxShops = t.MaxShops,
                 MaxUsers = t.MaxUsers,
-                DataIsolationMode = (POS.DTOs.Common.DataIsolationMode)(int)t.DataIsolationMode,
+                DataIsolationMode = (DTOs.Common.DataIsolationMode)(int)t.DataIsolationMode,
                 ShopCount = t.Shops.Count(s => s.IsActive),
                 UserCount = t.Users.Count(u => u.IsActive)
             });
@@ -125,7 +126,7 @@ namespace POS.Entities.IServices
             var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == dto.TenantId && t.IsActive)
                 ?? throw new KeyNotFoundException($"Tenant {dto.TenantId} not found.");
 
-            tenant.SubscriptionStatus = (POS.Entities.Common.SubscriptionStatus)(int)dto.SubscriptionStatus;
+            tenant.SubscriptionStatus = (SubscriptionStatus)(int)dto.SubscriptionStatus;
             tenant.SubscriptionPlanCode = dto.SubscriptionPlanCode ?? tenant.SubscriptionPlanCode;
             tenant.SubscriptionEndDate = dto.SubscriptionEndDate;
 

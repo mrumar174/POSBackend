@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Identity;
-using POS.Entities.IServices;
+using POS.Entities.IServices.Identity;
 
 namespace POS.Web.Controllers
 {

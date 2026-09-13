@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using POS.DTOs.Identity;
 using POS.Entities.Data;
 using POS.Entities.Identity;
-using POS.Entities.IServices;
+using POS.Entities.IServices.Identity;
 
-namespace POS.Entities.Services
+namespace POS.Entities.Services.Identity
 {
     public class PermissionService : IPermissionService
     {

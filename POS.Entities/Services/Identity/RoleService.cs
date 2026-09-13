@@ -4,14 +4,14 @@ using POS.DTOs.Identity;
 using POS.Entities.Common;
 using POS.Entities.Data;
 using POS.Entities.Identity;
-using POS.Entities.IServices;
+using POS.Entities.IServices.Identity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace POS.Entities.Services
+namespace POS.Entities.Services.Identity
 {
     public class RoleService : IRoleService
     {

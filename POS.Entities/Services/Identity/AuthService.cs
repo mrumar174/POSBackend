@@ -7,13 +7,13 @@ using POS.DTOs.Auth;
 using POS.DTOs.Identity;
 using POS.Entities.Data;
 using POS.Entities.Identity;
-using POS.Entities.IServices;
+using POS.Entities.IServices.Identity;
 using POS.Entities.Tenancy;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace POS.Entities.Services
+namespace POS.Entities.Services.Identity
 {
     public class AuthService : IAuthService
     {
@@ -169,7 +169,7 @@ namespace POS.Entities.Services
                 ExpiresAtUtc = expiresAtUtc,
                 TenantId = tenant.Id,
                 ShopId = shop.Id,
-                User = new POS.DTOs.Identity.UserDto
+                User = new UserDto
                 {
                     Id = adminUser.Id,
                     UserName = adminUser.UserName,

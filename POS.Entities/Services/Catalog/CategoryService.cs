@@ -6,7 +6,7 @@ using POS.Entities.Common;
 using POS.Entities.Data;
 using POS.Entities.IServices;
 
-namespace POS.Entities.Services
+namespace POS.Entities.Services.Catalog
 {
     public class CategoryService : ICategoryService
     {

@@ -6,7 +6,13 @@ using Microsoft.OpenApi.Models;
 using POS.Entities.Common;
 using POS.Entities.Data;
 using POS.Entities.IServices;
+using POS.Entities.IServices.Catalog;
+using POS.Entities.IServices.Identity;
+using POS.Entities.IServices.Tenancy;
 using POS.Entities.Services;
+using POS.Entities.Services.Catalog;
+using POS.Entities.Services.Identity;
+using POS.Entities.Services.Temancy;
 using POS.Web.Services;
 using System.Text;
 
@@ -32,11 +38,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ---------------------------------------------------------------
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
-builder.Services.AddScoped<ITenantService, POS.Entities.IServices.TenantService>();
+builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IShopService, ShopService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IBrandService, BrandService>();
+builder.Services.AddScoped<IUnitService, UnitService>();
 // builder.Services.AddScoped<IAuthService, AuthService>();
 
 // ---------------------------------------------------------------
