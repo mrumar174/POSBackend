@@ -18,6 +18,8 @@ namespace POS.Entities.Data
     public class ApplicationDbContext : DbContext
     {
         private readonly ICurrentUserService _currentUser;
+        private int CurrentTenantId => _currentUser.TenantId;
+        private int? CurrentShopId => _currentUser.ShopId;
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ICurrentUserService currentUser)
             : base(options)
@@ -199,22 +201,20 @@ namespace POS.Entities.Data
             }
         }
 
-        private void ApplyTenantFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, ITenantScoped
+        private void ApplyTenantFilter<TEntity>(ModelBuilder modelBuilder)
+            where TEntity : class, ITenantScoped
         {
-            var tenantId = _currentUser.TenantId;
             modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
-                e.TenantId == tenantId && EF.Property<bool>(e, nameof(AuditableEntity.IsActive)));
+                e.TenantId == CurrentTenantId &&
+                EF.Property<bool>(e, nameof(AuditableEntity.IsActive)));
         }
 
-        private void ApplyShopFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, IShopScoped
+        private void ApplyShopFilter<TEntity>(ModelBuilder modelBuilder)
+            where TEntity : class, IShopScoped
         {
-            var tenantId = _currentUser.TenantId;
-            var shopId = _currentUser.ShopId;
-            // ShopId == null (e.g. a tenant owner viewing "all branches") means don't
-            // restrict by shop — TenantId isolation still applies.
             modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
-                e.TenantId == tenantId
-                && (shopId == null || e.ShopId == shopId)
+                e.TenantId == CurrentTenantId
+                && (CurrentShopId == null || e.ShopId == CurrentShopId)
                 && EF.Property<bool>(e, nameof(AuditableEntity.IsActive)));
         }
 

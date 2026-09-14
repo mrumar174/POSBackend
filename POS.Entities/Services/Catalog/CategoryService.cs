@@ -28,10 +28,7 @@ namespace POS.Entities.Services.Catalog
         // caller's tenant. That's the whole point of the multi-shop setup.
         public async Task<List<CategoryDto>> GetAllAsync()
         {
-            var tenantId = _currentUser.TenantId;
-
             var categories = await _db.Categories
-                .Where(x => x.TenantId == _currentUser.TenantId)
                 .OrderBy(c => c.Name)
                 .ToListAsync();
 
