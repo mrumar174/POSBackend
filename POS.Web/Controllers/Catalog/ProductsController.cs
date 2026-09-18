@@ -6,7 +6,7 @@ using POS.Entities.IServices;
 using POS.Entities.IServices.Catalog;
 using POS.Web.Authorization;
 
-namespace POS.Web.Controllers
+namespace POS.Web.Controllers.Catalog
 {
     [ApiController]
     [Route("api/[controller]")]

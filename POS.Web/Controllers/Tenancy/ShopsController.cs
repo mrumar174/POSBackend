@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Tenancy;
 using POS.Entities.IServices.Tenancy;
 
-namespace POS.Web.Controllers
+namespace POS.Web.Controllers.Tenancy
 {
     [ApiController]
     [Authorize]

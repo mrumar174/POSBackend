@@ -4,7 +4,7 @@ using POS.DTOs.Catalog;
 using POS.Entities.IServices;
 using POS.Web.Authorization;
 
-namespace POS.Web.Controllers
+namespace POS.Web.Controllers.Catalog
 {
     /// <summary>
     /// Reference pattern for every other simple master-data controller
