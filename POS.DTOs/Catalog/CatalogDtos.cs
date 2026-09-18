@@ -113,4 +113,15 @@ namespace POS.DTOs.Catalog
         public string Barcode { get; set; } = default!;
         public bool IsPrimary { get; set; }
     }
+    public class ProductQueryDto
+    {
+        public string? Search { get; set; }       // matches Name or ProductCode
+        public string? Name { get; set; }
+        public string? ProductCode { get; set; }
+        public int? CategoryId { get; set; }
+        public int? BrandId { get; set; }
+        public int? UnitId { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+    }
 }

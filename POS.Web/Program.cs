@@ -45,7 +45,7 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBrandService, BrandService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
-// builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IProductService, ProductService>();
 
 // ---------------------------------------------------------------
 // JWT Authentication — required because controllers use [Authorize].

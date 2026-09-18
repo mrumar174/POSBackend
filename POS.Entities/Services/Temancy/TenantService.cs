@@ -2,6 +2,7 @@
 using POS.DTOs.Tenancy;
 using POS.Entities.Common;
 using POS.Entities.Data;
+using POS.Entities.Identity;
 using POS.Entities.IServices.Tenancy;
 using POS.Entities.Tenancy;
 using System;
@@ -76,8 +77,7 @@ namespace POS.Entities.Services.Temancy
                 SubscriptionStartDate = DateTime.Now
             };
 
-            // Every tenant gets exactly one shop row at signup — see Shop.cs comment.
-            tenant.Shops.Add(new Shop
+            var shop = new Shop
             {
                 Code = "SHOP-00001",
                 Name = string.IsNullOrWhiteSpace(dto.MainShopName) ? "Main Branch" : dto.MainShopName,
@@ -86,7 +86,20 @@ namespace POS.Entities.Services.Temancy
                 ContactNo = dto.ContactNo,
                 IsMainBranch = true,
                 InvoicePrefix = code
-            });
+            };
+            tenant.Shops.Add(shop);
+
+            if (!string.IsNullOrWhiteSpace(dto.AdminUserName) && !string.IsNullOrWhiteSpace(dto.AdminPassword))
+            {
+                var adminUser = new User
+                {
+                    UserName = dto.AdminUserName,
+                    FullName = string.IsNullOrWhiteSpace(dto.AdminFullName) ? dto.AdminUserName : dto.AdminFullName,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.AdminPassword)
+                };
+                adminUser.UserShops.Add(new UserShop { Shop = shop, IsDefault = true });
+                tenant.Users.Add(adminUser);
+            }
 
             _db.Tenants.Add(tenant);
             await _db.SaveChangesAsync();
