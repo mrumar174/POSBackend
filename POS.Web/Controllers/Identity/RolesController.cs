@@ -3,37 +3,37 @@ using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Identity;
 using POS.Entities.IServices.Identity;
 
-namespace POS.Web.Controllers
+namespace POS.Web.Controllers.Identity
 {
     [ApiController]
     [Authorize]
     [Route("api/[controller]")]
-    public class UsersController : ControllerBase
+    public class RolesController : ControllerBase
     {
-        private readonly IUserService _userService;
+        private readonly IRoleService _roleService;
 
-        public UsersController(IUserService userService)
+        public RolesController(IRoleService roleService)
         {
-            _userService = userService;
+            _roleService = roleService;
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<UserDto>>> GetAll()
-            => Ok(await _userService.GetAllAsync());
+        public async Task<ActionResult<List<RoleDto>>> GetAll()
+            => Ok(await _roleService.GetAllAsync());
 
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<UserDto>> GetById(int id)
+        public async Task<ActionResult<RoleDto>> GetById(int id)
         {
-            var user = await _userService.GetByIdAsync(id);
-            return user is null ? NotFound() : Ok(user);
+            var role = await _roleService.GetByIdAsync(id);
+            return role is null ? NotFound() : Ok(role);
         }
 
         [HttpPost]
-        public async Task<ActionResult<UserDto>> Create(CreateUserDto dto)
+        public async Task<ActionResult<RoleDto>> Create(CreateRoleDto dto)
         {
             try
             {
-                var created = await _userService.CreateAsync(dto);
+                var created = await _roleService.CreateAsync(dto);
                 return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
             }
             catch (InvalidOperationException ex)
@@ -43,13 +43,13 @@ namespace POS.Web.Controllers
         }
 
         [HttpPut("{id:int}")]
-        public async Task<ActionResult<UserDto>> Update(int id, UpdateUserDto dto)
+        public async Task<ActionResult<RoleDto>> Update(int id, UpdateRoleDto dto)
         {
             if (id != dto.Id) return BadRequest("Route id does not match body id.");
 
             try
             {
-                return Ok(await _userService.UpdateAsync(dto));
+                return Ok(await _roleService.UpdateAsync(dto));
             }
             catch (KeyNotFoundException ex)
             {
@@ -66,30 +66,16 @@ namespace POS.Web.Controllers
         {
             try
             {
-                await _userService.DeleteAsync(id);
+                await _roleService.DeleteAsync(id);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)
             {
                 return NotFound(ex.Message);
             }
-        }
-
-        [HttpPost("change-password")]
-        public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
-        {
-            try
+            catch (InvalidOperationException ex)
             {
-                await _userService.ChangePasswordAsync(dto);
-                return NoContent();
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ex.Message);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(ex.Message);
+                return Conflict(ex.Message);
             }
         }
     }

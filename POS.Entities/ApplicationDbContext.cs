@@ -145,11 +145,11 @@ namespace POS.Entities.Data
             modelBuilder.Entity<RolePermission>().HasKey(x => new { x.RoleId, x.PermissionId });
             modelBuilder.Entity<UserShop>().HasKey(x => new { x.UserId, x.ShopId });
 
-            // ---------------------------------------------------------------
+            // --------------------------------------------------------------
             // 4. Unique indexes — moved from "global unique" (original single-shop
             //    script) to "unique per Tenant" (master data) or "unique per Shop"
             //    (per-branch documents like invoice numbers).
-            // ---------------------------------------------------------------
+            // --------------------------------------------------------------
             modelBuilder.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
             modelBuilder.Entity<Tenant>().HasIndex(x => x.Code).IsUnique();
             modelBuilder.Entity<Shop>().HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
