@@ -8,6 +8,8 @@ using POS.Entities.Data;
 using POS.Entities.IServices;
 using POS.Entities.IServices.Catalog;
 using POS.Entities.IServices.Identity;
+using POS.Entities.IServices.Purchasing;
+using POS.Entities.IServices.Settings;
 using POS.Entities.IServices.Tenancy;
 using POS.Entities.Services;
 using POS.Entities.Services.Catalog;
@@ -46,7 +48,9 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IBrandService, BrandService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IProductService, ProductService>();
-
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 // ---------------------------------------------------------------
 // JWT Authentication — required because controllers use [Authorize].
 // ICurrentUserService reads tenant_id/shop_id claims from this token.
