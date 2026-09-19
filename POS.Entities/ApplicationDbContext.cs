@@ -282,5 +282,5 @@ namespace POS.Entities.Data
 
 
 
-//Add - Migration InitialCreate - Project POS.Entities - StartupProject POS.Web - OutputDir Data / Migrations
-//Update - Database - Project POS.Entities - StartupProject POS.Web
+// Add-Migration 001 -Project POS.Entities -StartupProject POS.Web -OutputDir Data\Migrations
+// Update-Database -Project POS.Entities -StartupProject POS.Web

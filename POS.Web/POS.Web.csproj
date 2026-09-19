@@ -31,9 +31,7 @@
     <Folder Include="Controllers\Common\" />
     <Folder Include="Controllers\Finance\" />
     <Folder Include="Controllers\Inventory\" />
-    <Folder Include="Controllers\Settings\" />
     <Folder Include="Controllers\Sales\" />
-    <Folder Include="Controllers\Purchasing\" />
   </ItemGroup>
 
 </Project>
