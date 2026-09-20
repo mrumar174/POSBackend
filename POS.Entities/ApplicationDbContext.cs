@@ -190,6 +190,16 @@ namespace POS.Entities.Data
                 .HasConversion<string>()
                 .HasMaxLength(30);
 
+            modelBuilder.Entity<Purchase>()
+                .Property(x => x.DiscountType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            modelBuilder.Entity<PurchaseDetail>()
+                .Property(x => x.DiscountType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
             // ---------------------------------------------------------------
             // 6. No cascade deletes anywhere. We soft-delete (IsActive = false),
             //    so cascading physical deletes would fight that and SQL Server

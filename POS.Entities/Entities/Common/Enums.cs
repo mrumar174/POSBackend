@@ -44,4 +44,10 @@ namespace POS.Entities.Common
         Shared = 1,
         Isolated = 2
     }
+    public enum DiscountType
+    {
+        Percentage = 1, 
+        PerPiece = 2,
+        Flat = 3
+    }
 }

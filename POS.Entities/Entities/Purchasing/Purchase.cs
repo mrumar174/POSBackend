@@ -20,6 +20,8 @@ namespace POS.Entities.Purchasing
         public DateTime PurchaseDate { get; set; } = DateTime.Now;
 
         public decimal SubTotal { get; set; }
+        public DiscountType DiscountType { get; set; } = DiscountType.Flat;
+        public decimal DiscountValue { get; set; }
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal GrandTotal { get; set; }
