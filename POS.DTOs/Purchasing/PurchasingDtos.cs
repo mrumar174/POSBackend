@@ -33,6 +33,8 @@ namespace POS.DTOs.Purchasing
         public string? ProductName { get; set; }
         public decimal Quantity { get; set; }
         public decimal PurchasePrice { get; set; }
+        public DiscountType DiscountType { get; set; }
+        public decimal DiscountValue { get; set; }
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal Total { get; set; }
@@ -43,7 +45,9 @@ namespace POS.DTOs.Purchasing
         public int ProductId { get; set; }
         public decimal Quantity { get; set; }
         public decimal PurchasePrice { get; set; }
-        public decimal Discount { get; set; }
+        public DiscountType DiscountType { get; set; } = DiscountType.Flat;
+        public decimal DiscountValue { get; set; }
+        //public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal Total { get; set; }
     }
@@ -56,6 +60,8 @@ namespace POS.DTOs.Purchasing
         public string? SupplierName { get; set; }
         public DateTime PurchaseDate { get; set; }
         public decimal SubTotal { get; set; }
+        public DiscountType DiscountType { get; set; }
+        public decimal DiscountValue { get; set; }
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal GrandTotal { get; set; }
@@ -74,7 +80,9 @@ namespace POS.DTOs.Purchasing
     {
         public int SupplierId { get; set; }
         public DateTime PurchaseDate { get; set; }
-        public decimal Discount { get; set; }
+        public DiscountType DiscountType { get; set; } = DiscountType.Flat;
+        public decimal DiscountValue { get; set; }
+        //public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal PaidAmount { get; set; }
         public int? PaymentMethodId { get; set; }
@@ -158,4 +166,10 @@ namespace POS.DTOs.Purchasing
         public string? ReferenceNo { get; set; }
         public string? Remarks { get; set; }
     }
+}
+public enum DiscountType
+{
+    Percentage = 1,
+    PerPiece = 2,
+    Flat = 3
 }
