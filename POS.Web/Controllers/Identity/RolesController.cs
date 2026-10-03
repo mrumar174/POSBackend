@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Identity;
 using POS.Entities.IServices.Identity;
+using POS.Web.Authorization;
 
 namespace POS.Web.Controllers.Identity
 {
@@ -28,6 +29,7 @@ namespace POS.Web.Controllers.Identity
             return role is null ? NotFound() : Ok(role);
         }
 
+        [RequirePermission("Roles.Create")] 
         [HttpPost]
         public async Task<ActionResult<RoleDto>> Create(CreateRoleDto dto)
         {
@@ -42,6 +44,7 @@ namespace POS.Web.Controllers.Identity
             }
         }
 
+        [RequirePermission("Roles.Edit")]
         [HttpPut("{id:int}")]
         public async Task<ActionResult<RoleDto>> Update(int id, UpdateRoleDto dto)
         {
@@ -61,6 +64,7 @@ namespace POS.Web.Controllers.Identity
             }
         }
 
+        [RequirePermission("Roles.Delete")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {

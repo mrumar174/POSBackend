@@ -9,5 +9,6 @@ namespace POS.Entities.IServices
         Task<PurchaseDto> CreateAsync(CreatePurchaseDto dto);
         Task<PurchaseDto> UpdateAsync(int id, CreatePurchaseDto dto);
         Task DeleteAsync(int id);
+        Task<List<PurchaseDto>> GetBySupplierAsync(int supplierId);
     }
 }

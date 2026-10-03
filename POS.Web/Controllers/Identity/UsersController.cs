@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Identity;
 using POS.Entities.IServices.Identity;
+using POS.Web.Authorization;
 
 namespace POS.Web.Controllers.Identity
 {
@@ -17,6 +18,7 @@ namespace POS.Web.Controllers.Identity
             _userService = userService;
         }
 
+        // You can optionally protect GET endpoints too, e.g., [RequirePermission("Users.View")]
         [HttpGet]
         public async Task<ActionResult<List<UserDto>>> GetAll()
             => Ok(await _userService.GetAllAsync());
@@ -28,6 +30,7 @@ namespace POS.Web.Controllers.Identity
             return user is null ? NotFound() : Ok(user);
         }
 
+        [RequirePermission("Users.Create")] // Added Permission Check
         [HttpPost]
         public async Task<ActionResult<UserDto>> Create(CreateUserDto dto)
         {
@@ -42,6 +45,7 @@ namespace POS.Web.Controllers.Identity
             }
         }
 
+        [RequirePermission("Users.Edit")] // Added Permission Check
         [HttpPut("{id:int}")]
         public async Task<ActionResult<UserDto>> Update(int id, UpdateUserDto dto)
         {
@@ -61,6 +65,7 @@ namespace POS.Web.Controllers.Identity
             }
         }
 
+        [RequirePermission("Users.Delete")] // Added Permission Check
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -75,6 +80,8 @@ namespace POS.Web.Controllers.Identity
             }
         }
 
+        // Depending on your logic, changing password might require a specific permission 
+        // or just be allowed for the currently logged-in user to change their own password.
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
         {

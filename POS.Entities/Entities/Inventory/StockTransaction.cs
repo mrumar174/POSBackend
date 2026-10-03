@@ -1,3 +1,4 @@
+using POS.DTOs.Common;
 using POS.Entities.Catalog;
 using POS.Entities.Common;
 

@@ -2,10 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using POS.DTOs.Identity;
 using POS.Entities.IServices.Identity;
+using POS.Web.Authorization; // Added to enable RequirePermission
 
 namespace POS.Web.Controllers.Identity
 {
     [ApiController]
+    [Authorize] // Applied globally to the controller
     [Route("api/[controller]")]
     public class PermissionsController : ControllerBase
     {
@@ -16,7 +18,6 @@ namespace POS.Web.Controllers.Identity
             _permissionService = permissionService;
         }
 
-        [Authorize]
         [HttpGet]
         public async Task<ActionResult<List<PermissionDto>>> GetAll([FromQuery] string? module)
         {
@@ -26,7 +27,6 @@ namespace POS.Web.Controllers.Identity
             return Ok(result);
         }
 
-        [Authorize]
         [HttpGet("{id:int}")]
         public async Task<ActionResult<PermissionDto>> GetById(int id)
         {
@@ -34,12 +34,7 @@ namespace POS.Web.Controllers.Identity
             return permission is null ? NotFound() : Ok(permission);
         }
 
-        // Anonymous ONLY so the very first deployment can seed permissions
-        // before any user/token exists. Duplicate names are rejected, so
-        // re-running this after go-live is safe but pointless. Once you have
-        // a SuperAdmin role, switch this to [Authorize(Roles = "SuperAdmin")]
-        // and seed permissions through Step 1's login flow instead.
-        [AllowAnonymous]
+        [RequirePermission("Permissions.Create")] // Replaced [AllowAnonymous] with Permission check
         [HttpPost]
         public async Task<ActionResult<PermissionDto>> Create(CreatePermissionDto dto)
         {
@@ -54,7 +49,7 @@ namespace POS.Web.Controllers.Identity
             }
         }
 
-        [AllowAnonymous]
+        [RequirePermission("Permissions.Create")] // Replaced [AllowAnonymous] with Permission check
         [HttpPost("bulk")]
         public async Task<ActionResult<List<PermissionDto>>> CreateMany(List<CreatePermissionDto> dtos)
             => Ok(await _permissionService.CreateManyAsync(dtos));
