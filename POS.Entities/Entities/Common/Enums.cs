@@ -1,14 +1,14 @@
 namespace POS.Entities.Common
 {
-    public enum StockTransactionType
-    {
-        OPENING = 1,
-        PURCHASE = 2,
-        SALE = 3,
-        SALE_RETURN = 4,
-        PURCHASE_RETURN = 5,
-        ADJUSTMENT = 6
-    }
+    //public enum StockTransactionType
+    //{
+    //    OPENING = 1,
+    //    PURCHASE = 2,
+    //    SALE = 3,
+    //    SALE_RETURN = 4,
+    //    PURCHASE_RETURN = 5,
+    //    ADJUSTMENT = 6
+    //}
 
     public enum CashTransactionType
     {

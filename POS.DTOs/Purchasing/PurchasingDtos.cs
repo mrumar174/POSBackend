@@ -166,6 +166,38 @@ namespace POS.DTOs.Purchasing
         public string? ReferenceNo { get; set; }
         public string? Remarks { get; set; }
     }
+    public class UnpaidPurchaseDto
+    {
+        public int Id { get; set; }
+        public string InvoiceNo { get; set; } = default!;
+        public int SupplierId { get; set; }
+        public string? SupplierName { get; set; }
+        public DateTime PurchaseDate { get; set; }
+        public decimal GrandTotal { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal DueAmount { get; set; }
+    }
+
+    public class SupplierPaymentQueryDto
+    {
+        public int? SupplierId { get; set; }
+        public int? PurchaseId { get; set; }
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
+        public string? PaymentNo { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+    }
+    public class PurchaseReturnQueryDto
+    {
+        public string? ReturnNo { get; set; }
+        public int? SupplierId { get; set; }
+        public int? PurchaseId { get; set; }
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+    }
 }
 public enum DiscountType
 {

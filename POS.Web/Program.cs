@@ -51,6 +51,9 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<ISupplierPaymentService, SupplierPaymentService>();
+builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
+
 // ---------------------------------------------------------------
 // JWT Authentication — required because controllers use [Authorize].
 // ICurrentUserService reads tenant_id/shop_id claims from this token.
@@ -112,8 +115,15 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAngularDev", policy =>
         policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod());
 });
+
+// ---------------------------------------------------------------
+// Custom Authorization Handlers
+// ---------------------------------------------------------------
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, POS.Web.Authorization.PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, POS.Web.Authorization.PermissionAuthorizationHandler>();
+// Intercepts 403 Forbidden results and formats them as JSON for Angular
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, POS.Web.Authorization.CustomAuthorizationMiddlewareResultHandler>();
+
 var app = builder.Build();
 
 // ---------------------------------------------------------------

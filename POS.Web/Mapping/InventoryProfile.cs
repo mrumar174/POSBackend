@@ -8,7 +8,7 @@ namespace POS.Web.Mapping
     {
         public InventoryProfile()
         {
-            CreateMap<POS.Entities.Common.StockTransactionType, POS.DTOs.Common.StockTransactionType>();
+            //CreateMap<POS.Entities.Common.StockTransactionType, POS.DTOs.Common.StockTransactionType>();
 
             CreateMap<StockTransaction, StockTransactionDto>()
                 .ForMember(d => d.ProductName, o => o.MapFrom(s => s.Product.Name));

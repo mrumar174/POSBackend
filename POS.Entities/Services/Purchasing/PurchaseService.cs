@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using POS.DTOs.Common;
 using POS.DTOs.Purchasing;
 using POS.Entities.Common;
 using POS.Entities.Data;
@@ -457,5 +458,7 @@ namespace POS.Entities.Services
                 _ => discountValue
             };
         }
+        public async Task<List<PurchaseDto>> GetBySupplierAsync(int supplierId)
+            => await ProjectToDto().Where(p => p.SupplierId == supplierId).OrderByDescending(p => p.PurchaseDate).ToListAsync();
     }
 }
