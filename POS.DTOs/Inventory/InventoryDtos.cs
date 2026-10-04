@@ -60,4 +60,17 @@ namespace POS.DTOs.Inventory
         public string? Remarks { get; set; }
         public List<CreateStockAdjustmentDetailDto> Items { get; set; } = new();
     }
+    public class StockSummaryDto
+    {
+        public int ProductId { get; set; }
+        public string ProductCode { get; set; } = default!;
+        public string ProductName { get; set; } = default!;
+        public string CategoryName { get; set; } = default!;
+        public string UnitShortName { get; set; } = default!;
+        public int ShopId { get; set; }
+        public string? ShopName { get; set; }
+        public decimal QuantityOnHand { get; set; }
+        public decimal MinimumStock { get; set; }
+        public bool IsLowStock { get; set; }
+    }
 }

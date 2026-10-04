@@ -8,12 +8,16 @@ using POS.Entities.Data;
 using POS.Entities.IServices;
 using POS.Entities.IServices.Catalog;
 using POS.Entities.IServices.Identity;
+using POS.Entities.IServices.Inventory;
 using POS.Entities.IServices.Purchasing;
+using POS.Entities.IServices.Sales;
 using POS.Entities.IServices.Settings;
 using POS.Entities.IServices.Tenancy;
 using POS.Entities.Services;
 using POS.Entities.Services.Catalog;
 using POS.Entities.Services.Identity;
+using POS.Entities.Services.Sales;
+using POS.Entities.Services.Settings;
 using POS.Entities.Services.Temancy;
 using POS.Web.Services;
 using System.Text;
@@ -53,6 +57,9 @@ builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<ISupplierPaymentService, SupplierPaymentService>();
 builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
+builder.Services.AddScoped<IStockService, StockService>();
+builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
+builder.Services.AddScoped<ISaleService, SaleService>();
 
 // ---------------------------------------------------------------
 // JWT Authentication — required because controllers use [Authorize].
