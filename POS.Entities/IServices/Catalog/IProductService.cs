@@ -16,5 +16,7 @@ namespace POS.Entities.IServices.Catalog
         Task<ProductDto> UpdateAsync(UpdateProductDto dto);
         Task DeleteAsync(int id);
         Task<PagedResultDto<ProductDto>> SearchAsync(ProductQueryDto query);
+        Task<List<ProductBarcodeLabelDto>> GetBarcodeLabelsAsync(List<int> productIds);
+        Task<ProductDto> GenerateBarcodeAsync(int productId);
     }
 }

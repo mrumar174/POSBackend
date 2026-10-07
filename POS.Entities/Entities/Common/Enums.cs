@@ -18,7 +18,9 @@ namespace POS.Entities.Common
         SUPPLIER_PAYMENT = 4,
         CASH_DEPOSIT = 5,
         CASH_WITHDRAWAL = 6,
-        ADJUSTMENT = 7
+        ADJUSTMENT = 7,
+        CASH_IN = 8,
+        CASH_OUT = 9
     }
 
     /// <summary>

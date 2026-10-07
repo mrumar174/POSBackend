@@ -32,13 +32,17 @@ namespace POS.Entities.Services.Sales
                 {
                     Id = s.Id,
                     InvoiceNo = s.InvoiceNo,
+                    CustomerName = s.CustomerName,
                     SaleDate = s.SaleDate,
                     SubTotal = s.SubTotal,
+                    DiscountType = s.DiscountType,
+                    DiscountValue = s.DiscountValue,
                     Discount = s.Discount,
                     Tax = s.Tax,
                     GrandTotal = s.GrandTotal,
                     PaidAmount = s.PaidAmount,
                     DueAmount = s.DueAmount,
+                    ChangeAmount = s.ChangeAmount,
                     PaymentMethodId = s.PaymentMethodId,
                     PaymentMethodName = s.PaymentMethod != null ? s.PaymentMethod.Name : null,
                     Remarks = s.Remarks,
@@ -49,6 +53,8 @@ namespace POS.Entities.Services.Sales
                         ProductName = d.Product.Name,
                         Quantity = d.Quantity,
                         SalePrice = d.SalePrice,
+                        DiscountType = d.DiscountType,
+                        DiscountValue = d.DiscountValue,
                         Discount = d.Discount,
                         Tax = d.Tax,
                         Total = d.Total
@@ -68,7 +74,6 @@ namespace POS.Entities.Services.Sales
             var shopId = _currentUser.ShopId ?? throw new InvalidOperationException("No shop selected.");
             var invoiceNo = await GenerateNextInvoiceNoAsync(shopId);
 
-            // Group requested items to handle duplicate product rows in the same cart gracefully
             var productDemands = dto.Items
                 .GroupBy(i => i.ProductId)
                 .Select(g => new { ProductId = g.Key, TotalQuantity = g.Sum(x => x.Quantity) })
@@ -77,7 +82,6 @@ namespace POS.Entities.Services.Sales
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                // CRITICAL: Stock Validation
                 foreach (var demand in productDemands)
                 {
                     var currentStock = await _stockService.GetProductStockAsync(demand.ProductId);
@@ -88,40 +92,47 @@ namespace POS.Entities.Services.Sales
                     }
                 }
 
-                var (subTotal, grandTotal) = CalculateTotals(dto.Items, dto.Discount, dto.Tax);
+                var (subTotal, grandTotal) = CalculateTotals(dto.Items, dto.DiscountType, dto.DiscountValue, dto.Tax, out var headerDiscount);
 
                 var sale = new Sale
                 {
                     InvoiceNo = invoiceNo,
+                    CustomerName = dto.CustomerName,
                     SaleDate = dto.SaleDate,
                     SubTotal = subTotal,
-                    Discount = dto.Discount,
+                    DiscountType = dto.DiscountType,
+                    DiscountValue = dto.DiscountValue,
+                    Discount = headerDiscount,
                     Tax = dto.Tax,
                     GrandTotal = grandTotal,
                     PaidAmount = dto.PaidAmount,
-                    // If PaidAmount > GrandTotal, DueAmount is 0 (Change is frontend computed)
                     DueAmount = Math.Max(0, grandTotal - dto.PaidAmount),
+                    ChangeAmount = dto.PaidAmount > grandTotal ? dto.PaidAmount - grandTotal : 0,
                     PaymentMethodId = dto.PaymentMethodId,
                     Remarks = dto.Remarks
                 };
 
                 foreach (var item in dto.Items)
                 {
-                    var lineTotal = (item.Quantity * item.SalePrice) - item.Discount + item.Tax;
+                    var baseAmount = item.Quantity * item.SalePrice;
+                    var itemDiscount = ComputeDiscountAmount(item.DiscountType, item.DiscountValue, baseAmount, item.Quantity);
+                    var lineTotal = Math.Max(0, baseAmount - itemDiscount + item.Tax);
 
                     sale.SaleDetails.Add(new SaleDetail
                     {
                         ProductId = item.ProductId,
                         Quantity = item.Quantity,
                         SalePrice = item.SalePrice,
-                        Discount = item.Discount,
+                        DiscountType = item.DiscountType,
+                        DiscountValue = item.DiscountValue,
+                        Discount = itemDiscount,
                         Tax = item.Tax,
-                        Total = Math.Max(0, lineTotal)
+                        Total = lineTotal
                     });
                 }
 
                 _db.Sales.Add(sale);
-                await _db.SaveChangesAsync(); // Generates Sale.Id for StockTransactions
+                await _db.SaveChangesAsync();
 
                 ApplyStockTransactions(sale, dto.Items);
 
@@ -158,16 +169,13 @@ namespace POS.Entities.Services.Sales
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                // 1. Reverse old stock impact completely
                 var oldStockRows = await _db.StockTransactions
                     .Where(s => s.ReferenceType == "Sale" && s.ReferenceId == sale.Id)
                     .ToListAsync();
                 _db.StockTransactions.RemoveRange(oldStockRows);
 
-                // Save changes here so the reversed stock is visible to IStockService validation
                 await _db.SaveChangesAsync();
 
-                // 2. Validate new stock demands against restored inventory
                 foreach (var demand in productDemands)
                 {
                     var currentStock = await _stockService.GetProductStockAsync(demand.ProductId);
@@ -178,41 +186,46 @@ namespace POS.Entities.Services.Sales
                     }
                 }
 
-                // 3. Clear old items
                 _db.SaleDetails.RemoveRange(sale.SaleDetails);
                 sale.SaleDetails.Clear();
 
-                // 4. Update Header
-                var (subTotal, grandTotal) = CalculateTotals(dto.Items, dto.Discount, dto.Tax);
+                var (subTotal, grandTotal) = CalculateTotals(dto.Items, dto.DiscountType, dto.DiscountValue, dto.Tax, out var headerDiscount);
 
+                sale.CustomerName = dto.CustomerName;
                 sale.SaleDate = dto.SaleDate;
                 sale.SubTotal = subTotal;
-                sale.Discount = dto.Discount;
+                sale.DiscountType = dto.DiscountType;
+                sale.DiscountValue = dto.DiscountValue;
+                sale.Discount = headerDiscount;
                 sale.Tax = dto.Tax;
                 sale.GrandTotal = grandTotal;
                 sale.PaidAmount = dto.PaidAmount;
                 sale.DueAmount = Math.Max(0, grandTotal - dto.PaidAmount);
+                sale.ChangeAmount = dto.PaidAmount > grandTotal ? dto.PaidAmount - grandTotal : 0;
                 sale.PaymentMethodId = dto.PaymentMethodId;
                 sale.Remarks = dto.Remarks;
 
-                // 5. Append new items
                 foreach (var item in dto.Items)
                 {
-                    var lineTotal = (item.Quantity * item.SalePrice) - item.Discount + item.Tax;
+                    var baseAmount = item.Quantity * item.SalePrice;
+                    var itemDiscount = ComputeDiscountAmount(item.DiscountType, item.DiscountValue, baseAmount, item.Quantity);
+                    var lineTotal = Math.Max(0, baseAmount - itemDiscount + item.Tax);
+
                     sale.SaleDetails.Add(new SaleDetail
                     {
                         ProductId = item.ProductId,
                         Quantity = item.Quantity,
                         SalePrice = item.SalePrice,
-                        Discount = item.Discount,
+                        DiscountType = item.DiscountType,
+                        DiscountValue = item.DiscountValue,
+                        Discount = itemDiscount,
                         Tax = item.Tax,
-                        Total = Math.Max(0, lineTotal)
+                        Total = lineTotal
                     });
                 }
 
                 await _db.SaveChangesAsync();
 
-                // 6. Re-apply new stock out transactions
                 ApplyStockTransactions(sale, dto.Items);
 
                 await _db.SaveChangesAsync();
@@ -277,18 +290,37 @@ namespace POS.Entities.Services.Sales
             }
         }
 
-        private static (decimal subTotal, decimal grandTotal) CalculateTotals(List<CreateSaleDetailDto> items, decimal headerDiscount, decimal headerTax)
+        private static (decimal subTotal, decimal grandTotal) CalculateTotals(
+            List<CreateSaleDetailDto> items,
+            DiscountType headerDiscountType,
+            decimal headerDiscountValue,
+            decimal headerTax,
+            out decimal headerDiscountAmount)
         {
             decimal subTotal = 0;
 
             foreach (var item in items)
             {
-                var lineTotal = (item.Quantity * item.SalePrice) - item.Discount + item.Tax;
-                subTotal += Math.Max(0, lineTotal);
+                var baseAmount = item.Quantity * item.SalePrice;
+                var itemDiscount = ComputeDiscountAmount(item.DiscountType, item.DiscountValue, baseAmount, item.Quantity);
+                subTotal += Math.Max(0, baseAmount - itemDiscount + item.Tax);
             }
 
-            var grandTotal = Math.Max(0, subTotal - headerDiscount + headerTax);
+            headerDiscountAmount = ComputeDiscountAmount(headerDiscountType, headerDiscountValue, subTotal, items.Sum(i => i.Quantity));
+            var grandTotal = Math.Max(0, subTotal - headerDiscountAmount + headerTax);
+
             return (subTotal, grandTotal);
+        }
+
+        private static decimal ComputeDiscountAmount(DiscountType type, decimal discountValue, decimal baseAmount, decimal quantity)
+        {
+            return type switch
+            {
+                DiscountType.Percentage => Math.Round(baseAmount * (discountValue / 100m), 2),
+                DiscountType.PerPiece => Math.Round(discountValue * quantity, 2),
+                DiscountType.Flat => discountValue,
+                _ => discountValue
+            };
         }
 
         private static void ValidateItems(List<CreateSaleDetailDto> items)
@@ -302,6 +334,8 @@ namespace POS.Entities.Services.Sales
                     throw new InvalidOperationException("Item quantity must be greater than zero.");
                 if (item.SalePrice < 0)
                     throw new InvalidOperationException("Item sale price cannot be negative.");
+                if (item.DiscountType == DiscountType.Percentage && item.DiscountValue > 100)
+                    throw new InvalidOperationException("Percentage discount cannot exceed 100.");
             }
         }
 

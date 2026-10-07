@@ -7,6 +7,8 @@ using POS.Entities.Common;
 using POS.Entities.Data;
 using POS.Entities.IServices;
 using POS.Entities.IServices.Catalog;
+using POS.Entities.IServices.Dashboard;
+using POS.Entities.IServices.Finance;
 using POS.Entities.IServices.Identity;
 using POS.Entities.IServices.Inventory;
 using POS.Entities.IServices.Purchasing;
@@ -15,6 +17,8 @@ using POS.Entities.IServices.Settings;
 using POS.Entities.IServices.Tenancy;
 using POS.Entities.Services;
 using POS.Entities.Services.Catalog;
+using POS.Entities.Services.Dashboard;
+using POS.Entities.Services.Finance;
 using POS.Entities.Services.Identity;
 using POS.Entities.Services.Sales;
 using POS.Entities.Services.Settings;
@@ -42,6 +46,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Application services (add one line per service as you build it —
 // see the Tenancy & Identity roadmap for the full list/order)
 // ---------------------------------------------------------------
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
@@ -60,6 +65,10 @@ builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
+builder.Services.AddScoped<ISaleReturnService, SaleReturnService>();
+builder.Services.AddScoped<IExpenseCategoryService, ExpenseCategoryService>();
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddScoped<IDailyCashClosingService, DailyCashClosingService>();
 
 // ---------------------------------------------------------------
 // JWT Authentication — required because controllers use [Authorize].

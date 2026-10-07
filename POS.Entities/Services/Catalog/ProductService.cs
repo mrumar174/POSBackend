@@ -335,5 +335,57 @@ namespace POS.Entities.Services
 
             return $"PRO-{(maxNumber + 1):D5}";
         }
+        public async Task<List<ProductBarcodeLabelDto>> GetBarcodeLabelsAsync(List<int> productIds)
+        {
+            if (productIds == null || !productIds.Any())
+                return new List<ProductBarcodeLabelDto>();
+
+            var products = await _db.Products
+                .Include(p => p.Unit)
+                .Include(p => p.Barcodes)
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync();
+
+            return products.Select(p => new ProductBarcodeLabelDto
+            {
+                ProductId = p.Id,
+                ProductName = p.Name,
+                ProductCode = p.ProductCode,
+                SalePrice = p.SalePrice,
+                UnitShortName = p.Unit?.ShortName,
+                Barcodes = p.Barcodes.Select(b => b.Barcode).ToList()
+            }).ToList();
+        }
+
+        public async Task<ProductDto> GenerateBarcodeAsync(int productId)
+        {
+            var product = await _db.Products
+                .Include(p => p.Barcodes)
+                .FirstOrDefaultAsync(p => p.Id == productId)
+                ?? throw new KeyNotFoundException($"Product {productId} not found.");
+
+            if (product.Barcodes.Any())
+                throw new InvalidOperationException("This product already has a barcode.");
+
+            // Generate an alphanumeric barcode derived directly from the ProductCode
+            var generatedValue = product.ProductCode.Replace("-", "");
+
+            // Verify global uniqueness just in case (though ProductCode uniqueness usually guarantees this)
+            if (await _db.ProductBarcodes.IgnoreQueryFilters().AnyAsync(b => b.Barcode == generatedValue))
+            {
+                // Fallback to appending a unique identifier if a collision happens
+                generatedValue = $"{generatedValue}{DateTime.Now.Ticks % 1000}";
+            }
+
+            product.Barcodes.Add(new ProductBarcode
+            {
+                Barcode = generatedValue,
+                IsPrimary = true
+            });
+
+            await _db.SaveChangesAsync();
+
+            return await GetByIdAsync(product.Id) ?? throw new InvalidOperationException("Failed to reload product.");
+        }
     }
 }

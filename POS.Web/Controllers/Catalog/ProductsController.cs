@@ -108,5 +108,26 @@ namespace POS.Web.Controllers.Catalog
             });
             return Ok(result);
         }
+        [HttpGet("barcode-labels")]
+        [ProducesResponseType(typeof(List<ProductBarcodeLabelDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<ProductBarcodeLabelDto>>> GetBarcodeLabels([FromQuery] List<int> productIds)
+        {
+            return Ok(await _productService.GetBarcodeLabelsAsync(productIds));
+        }
+
+        [HttpPost("{id:int}/generate-barcode")]
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ProductDto>> GenerateBarcode(int id)
+        {
+            try
+            {
+                var result = await _productService.GenerateBarcodeAsync(id);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        }
     }
 }

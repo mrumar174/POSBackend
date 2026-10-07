@@ -66,13 +66,15 @@ namespace POS.DTOs.Finance
     public class DailyCashClosingDto
     {
         public int Id { get; set; }
-        public DateOnly ClosingDate { get; set; }
+        public DateTime ClosingDate { get; set; }
         public decimal OpeningBalance { get; set; }
+        public decimal TotalSales { get; set; }
+        public decimal OtherCashIn { get; set; }     // TotalCashIn - TotalSales
         public decimal TotalCashIn { get; set; }
+        public decimal TotalExpenses { get; set; }
+        public decimal OtherCashOut { get; set; }    // TotalCashOut - TotalExpenses
         public decimal TotalCashOut { get; set; }
-        public decimal ExpectedCash { get; set; }
-        public decimal ActualCash { get; set; }
-        public decimal Difference { get; set; }
+        public decimal ClosingBalance { get; set; }
         public string? Remarks { get; set; }
     }
 
@@ -81,8 +83,41 @@ namespace POS.DTOs.Finance
     // enters what they actually counted.
     public class CreateDailyCashClosingDto
     {
-        public DateOnly ClosingDate { get; set; }
-        public decimal ActualCash { get; set; }
+        public DateTime ClosingDate { get; set; }
+        public decimal? ExpectedClosingBalance { get; set; }
         public string? Remarks { get; set; }
+    }
+    public class ExpenseQueryDto
+    {
+        public int? ExpenseCategoryId { get; set; }
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
+        public string? Search { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+    }
+    public class ExpensePageDto
+    {
+        public List<ExpenseDto> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public decimal TotalAmount { get; set; }   // sum over the whole filtered set, not just this page
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
+    public class DailyCashClosingPreviewDto
+    {
+        public DateTime ClosingDate { get; set; }
+        public DateTime? PreviousClosingDate { get; set; }
+        public decimal OpeningBalance { get; set; }
+        public decimal TotalSales { get; set; }
+        public decimal OtherCashIn { get; set; }
+        public decimal TotalCashIn { get; set; }
+        public decimal TotalExpenses { get; set; }
+        public decimal OtherCashOut { get; set; }
+        public decimal TotalCashOut { get; set; }
+        public decimal ClosingBalance { get; set; }
+        public bool AlreadyClosed { get; set; }
+        public bool CanClose { get; set; }
+        public string? BlockedReason { get; set; }
     }
 }
