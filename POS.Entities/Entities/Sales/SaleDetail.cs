@@ -13,6 +13,8 @@ namespace POS.Entities.Sales
 
         public decimal Quantity { get; set; }
         public decimal SalePrice { get; set; }
+        public DiscountType DiscountType { get; set; } = DiscountType.Flat;
+        public decimal DiscountValue { get; set; }
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal Total { get; set; }

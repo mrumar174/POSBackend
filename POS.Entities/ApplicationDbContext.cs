@@ -83,6 +83,19 @@ namespace POS.Entities.Data
             // 1. Decimal precision: money = (18,2), quantities = (18,3)
             //    (matches the DECIMAL(18,2)/DECIMAL(18,3) rule from the DB doc)
             // ---------------------------------------------------------------
+            modelBuilder.Entity<DailyCashClosing>(b =>
+            {
+                b.Property(x => x.ClosingDate).HasColumnType("date");   // date-only; makes the unique index per calendar day
+                b.Property(x => x.OpeningBalance).HasPrecision(18, 2);
+                b.Property(x => x.TotalSales).HasPrecision(18, 2);
+                b.Property(x => x.TotalExpenses).HasPrecision(18, 2);
+                b.Property(x => x.TotalCashIn).HasPrecision(18, 2);
+                b.Property(x => x.TotalCashOut).HasPrecision(18, 2);
+                b.Property(x => x.ClosingBalance).HasPrecision(18, 2);
+                b.Property(x => x.Remarks).HasMaxLength(500);
+
+                b.HasIndex(x => new { x.ShopId, x.ClosingDate }).IsUnique();   // one closing per shop per day
+            });
             var quantityProperties = new HashSet<string>
             {
                 nameof(Product.MinimumStock),
@@ -175,6 +188,7 @@ namespace POS.Entities.Data
             modelBuilder.Entity<SupplierPayment>().HasIndex(x => new { x.ShopId, x.PaymentNo }).IsUnique();
             modelBuilder.Entity<CashTransaction>().HasIndex(x => new { x.ShopId, x.TransactionNo }).IsUnique();
             modelBuilder.Entity<DailyCashClosing>().HasIndex(x => new { x.ShopId, x.ClosingDate }).IsUnique();
+            modelBuilder.Entity<CashTransaction>().HasIndex(x => new { x.ShopId, x.TransactionDate });
 
             // ---------------------------------------------------------------
             // 5. Enum columns stored as readable strings (mirrors the original

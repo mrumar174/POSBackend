@@ -124,4 +124,13 @@ namespace POS.DTOs.Catalog
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }
+    public class ProductBarcodeLabelDto
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = default!;
+        public string ProductCode { get; set; } = default!;
+        public decimal SalePrice { get; set; }
+        public string? UnitShortName { get; set; }
+        public List<string> Barcodes { get; set; } = new();
+    }
 }

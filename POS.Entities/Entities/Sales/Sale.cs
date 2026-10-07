@@ -11,14 +11,17 @@ namespace POS.Entities.Sales
     public class Sale : ShopAuditableEntity
     {
         public string InvoiceNo { get; set; } = default!;
+        public string? CustomerName { get; set; }
         public DateTime SaleDate { get; set; } = DateTime.Now;
-
         public decimal SubTotal { get; set; }
+        public DiscountType DiscountType { get; set; } = DiscountType.Flat;
+        public decimal DiscountValue { get; set; }
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal GrandTotal { get; set; }
         public decimal PaidAmount { get; set; }
         public decimal DueAmount { get; set; }
+        public decimal ChangeAmount { get; set; }
 
         public int? PaymentMethodId { get; set; }
         public PaymentMethod? PaymentMethod { get; set; }

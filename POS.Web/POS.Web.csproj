@@ -29,7 +29,6 @@
 
   <ItemGroup>
     <Folder Include="Controllers\Common\" />
-    <Folder Include="Controllers\Finance\" />
   </ItemGroup>
 
 </Project>
