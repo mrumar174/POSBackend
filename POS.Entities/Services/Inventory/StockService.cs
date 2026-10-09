@@ -265,5 +265,20 @@ namespace POS.Entities.Services
 
             return $"{prefix}-{(maxNumber + 1):D5}";
         }
+        public async Task<Dictionary<int, decimal>> GetStockDictionaryAsync()
+        {
+            var shopId = _currentUser.ShopId ?? 0;
+
+            // Group stock transactions by ProductId and calculate quantity on hand
+            return await _db.StockTransactions
+                .AsNoTracking()
+                .GroupBy(t => t.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    Stock = g.Sum(t => t.QuantityIn - t.QuantityOut)
+                })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Stock);
+        }
     }
 }

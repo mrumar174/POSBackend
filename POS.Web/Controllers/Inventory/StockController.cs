@@ -100,5 +100,12 @@ namespace POS.Web.Controllers
             catch (KeyNotFoundException) { return NotFound(); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
+        [HttpGet("dictionary")]
+        [ProducesResponseType(typeof(Dictionary<int, decimal>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Dictionary<int, decimal>>> GetStockDictionary()
+        {
+            var stockDict = await _stockService.GetStockDictionaryAsync();
+            return Ok(stockDict);
+        }
     }
 }

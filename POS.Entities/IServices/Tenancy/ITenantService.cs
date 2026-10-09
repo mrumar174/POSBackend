@@ -1,6 +1,11 @@
 ﻿using POS.DTOs.Tenancy;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace POS.Entities.IServices.Tenancy
+namespace POS.Entities.Entities.Tenancy
 {
     public interface ITenantService
     {
@@ -9,6 +14,6 @@ namespace POS.Entities.IServices.Tenancy
         Task<TenantDto> CreateAsync(CreateTenantDto dto);
         Task<TenantDto> UpdateAsync(UpdateTenantDto dto);
         Task<TenantDto> UpdateSubscriptionAsync(UpdateSubscriptionDto dto);
-        Task DeleteAsync(int id);
+        Task DeleteAsync(int id); // soft delete — sets IsActive = false
     }
 }
