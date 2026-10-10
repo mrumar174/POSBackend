@@ -19,5 +19,6 @@ namespace POS.Entities.IServices.Inventory
         Task<StockAdjustmentDto> CreateAdjustmentAsync(CreateStockAdjustmentDto dto);
         Task<StockAdjustmentDto> UpdateAdjustmentAsync(int id, CreateStockAdjustmentDto dto);
         Task DeleteAdjustmentAsync(int id);
+        Task<Dictionary<int, decimal>> GetStockDictionaryAsync();
     }
 }

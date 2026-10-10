@@ -2,6 +2,7 @@
 using POS.DTOs.Tenancy;
 using POS.Entities.Common;
 using POS.Entities.Data;
+using POS.Entities.Entities.Tenancy;
 using POS.Entities.Identity;
 using POS.Entities.IServices.Tenancy;
 using POS.Entities.Tenancy;
