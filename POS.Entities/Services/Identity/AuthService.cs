@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using POS.DTOs.Auth;
+using POS.DTOs.Common;
 using POS.DTOs.Identity;
 using POS.Entities.Data;
 using POS.Entities.Identity;
@@ -34,40 +35,85 @@ namespace POS.Entities.Services.Identity
                 .IgnoreQueryFilters()
                 .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
                     .ThenInclude(r => r.RolePermissions).ThenInclude(rp => rp.Permission)
-                .Include(u => u.UserShops)
+                .Include(u => u.UserShops).ThenInclude(us => us.Shop)
                 .FirstOrDefaultAsync(u =>
                     u.TenantId == dto.TenantId &&
-                    u.UserName.ToLower() == dto.UserName.ToLower());
+                    u.UserName.ToLower() == dto.UserName.ToLower() &&
+                    u.IsActive &&
+                    _db.Tenants.IgnoreQueryFilters()
+                        .Any(t => t.Id == u.TenantId && t.IsActive));
 
-            if (user is null)
-                throw new UnauthorizedAccessException("Invalid username.");
+            if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+                throw new UnauthorizedAccessException("Invalid username or password.");
 
-            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-                throw new UnauthorizedAccessException("Invalid password.");
+            // ── Subscription checks ──────────────────────────────────────────────
+            var tenant = await _db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Id == user.TenantId);   // ← declares `tenant`
 
-            if (!user.UserShops.Any())
-                throw new UnauthorizedAccessException("This user is not assigned to any shop.");
+            // SubscriptionStatus: Trial = 1, Active = 2, PastDue = 3, Suspended = 4, Cancelled = 5.
+            // Compared as numbers because the entity and the DTO each have their own enum with this name.
+            const int statusTrial = 1, statusSuspended = 4, statusCancelled = 5;
+            var statusValue = (int)tenant.SubscriptionStatus;
+
+            if (statusValue == statusSuspended)
+                throw new UnauthorizedAccessException("Your account has been suspended. Please contact support.");
+
+            if (statusValue == statusCancelled)
+                throw new UnauthorizedAccessException("Your subscription has been cancelled. Please contact support to reactivate.");
+
+            var isTrial = statusValue == statusTrial;
+            int? daysRemaining = null;
+            DateTime? tokenCutoffUtc = null;
+
+            if (tenant.SubscriptionEndDate.HasValue)
+            {
+                var endDate = tenant.SubscriptionEndDate.Value.Date;
+                var days = (endDate - DateTime.Today).Days;
+
+                if (days < 0)
+                    throw new UnauthorizedAccessException(isTrial
+                        ? $"Your free trial ended on {endDate:dd MMM yyyy}. Please contact support to activate your subscription."
+                        : $"Your subscription expired on {endDate:dd MMM yyyy}. Please contact support to renew.");
+
+                daysRemaining = days;
+                tokenCutoffUtc = endDate.AddDays(1).ToUniversalTime();   // token dies when the last day ends
+            }
+            // ─────────────────────────────────────────────────────────────────────
+
+            var activeShops = user.UserShops
+                .Where(us => us.Shop != null && us.Shop.IsActive)
+                .OrderByDescending(us => us.IsDefault)
+                .ToList();
+
+            if (!activeShops.Any())
+                throw new UnauthorizedAccessException("This user is not assigned to any active shop.");
 
             int shopId;
             if (dto.ShopId.HasValue)
             {
-                var hasAccess = user.UserShops.Any(us => us.ShopId == dto.ShopId.Value);
-                if (!hasAccess)
+                if (!activeShops.Any(us => us.ShopId == dto.ShopId.Value))
                     throw new UnauthorizedAccessException("You do not have access to the requested shop.");
                 shopId = dto.ShopId.Value;
             }
             else
             {
-                shopId = user.UserShops.First().ShopId;
+                shopId = activeShops.First().ShopId;
             }
 
-            var roles = user.UserRoles.Select(ur => ur.Role).ToList();
+            var roles = user.UserRoles
+                .Select(ur => ur.Role)
+                .Where(r => r != null && r.IsActive)
+                .ToList();
+
             var permissions = roles
-                .SelectMany(r => r.RolePermissions.Select(rp => rp.Permission.Name))
+                .SelectMany(r => r.RolePermissions
+                    .Where(rp => rp.Permission != null && rp.Permission.IsActive)
+                    .Select(rp => rp.Permission.Name))
                 .Distinct()
                 .ToList();
 
-            var (token, expiresAtUtc) = GenerateToken(user.Id, dto.TenantId, shopId, user.UserName, roles.Select(r => r.Name), permissions);
+            var (token, expiresAtUtc) = GenerateToken(
+                user.Id, dto.TenantId, shopId, user.UserName,
+                roles.Select(r => r.Name), permissions, tokenCutoffUtc);
 
             return new AuthResponseDto
             {
@@ -75,12 +121,16 @@ namespace POS.Entities.Services.Identity
                 ExpiresAtUtc = expiresAtUtc,
                 TenantId = dto.TenantId,
                 ShopId = shopId,
-                User = _mapper.Map<UserDto>(user)
+                User = _mapper.Map<UserDto>(user),
+                SubscriptionEndDate = tenant.SubscriptionEndDate,
+                SubscriptionDaysRemaining = daysRemaining,
+                IsTrial = isTrial
             };
         }
         private (string token, DateTime expiresAtUtc) GenerateToken(
-            int userId, int tenantId, int shopId, string userName,
-            IEnumerable<string> roles, IEnumerable<string> permissions)
+    int userId, int tenantId, int shopId, string userName,
+    IEnumerable<string> roles, IEnumerable<string> permissions,
+    DateTime? maxExpiryUtc = null)
         {
             var jwtKey = _config["Jwt:Key"]
                 ?? throw new InvalidOperationException("Jwt:Key is missing from appsettings.json.");
@@ -89,20 +139,23 @@ namespace POS.Entities.Services.Identity
             var expiryMinutes = _config.GetValue<int?>("Jwt:ExpiryMinutes") ?? 480;
 
             var claims = new List<Claim>
-            {
-                new(JwtRegisteredClaimNames.Sub, userId.ToString()),
-                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new(ClaimTypes.Name, userName),
-                new("tenant_id", tenantId.ToString()),
-                new("shop_id", shopId.ToString()),
-            };
+    {
+        new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+        new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        new(ClaimTypes.Name, userName),
+        new("tenant_id", tenantId.ToString()),
+        new("shop_id", shopId.ToString()),
+    };
 
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
             claims.AddRange(permissions.Select(p => new Claim("permission", p)));
 
             var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
             var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiryMinutes);
+            if (maxExpiryUtc.HasValue && maxExpiryUtc.Value < expiresAtUtc)
+                expiresAtUtc = maxExpiryUtc.Value;
 
             var token = new JwtSecurityToken(
                 issuer: issuer,

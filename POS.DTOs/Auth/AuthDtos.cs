@@ -21,6 +21,9 @@ namespace POS.DTOs.Auth
         public int TenantId { get; set; }
         public int ShopId { get; set; }
         public UserDto User { get; set; } = default!;
+        public DateTime? SubscriptionEndDate { get; set; }
+        public int? SubscriptionDaysRemaining { get; set; }
+        public bool IsTrial { get; set; }
     }
     public class TenantSignupDto
     {
