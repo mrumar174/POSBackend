@@ -16,6 +16,9 @@ namespace POS.Entities.Services.Temancy
 {
     public class TenantService : ITenantService
     {
+        private const int TrialDays = 3;
+        private const string SuperAdminRoleName = "Admin";
+        private static readonly string[] PlatformOnlyPermissionPrefixes = { "Tenants.", "Permissions." };
         private readonly ApplicationDbContext _db;
         private readonly ICurrentUserService _currentUser;
 
@@ -29,7 +32,7 @@ namespace POS.Entities.Services.Temancy
         // (POS.Entities.Common vs POS.DTOs.Common) get cast explicitly.
         // Excludes soft-deleted tenants.
         private IQueryable<TenantDto> TenantsWithCounts() =>
-            _db.Tenants.Where(t => t.IsActive).Select(t => new TenantDto
+            _db.Tenants.IgnoreQueryFilters().Where(t => t.IsActive).Select(t => new TenantDto
             {
                 Id = t.Id,
                 Code = t.Code,
@@ -59,8 +62,30 @@ namespace POS.Entities.Services.Temancy
 
         public async Task<TenantDto> CreateAsync(CreateTenantDto dto)
         {
+            // Subscription: a trial is fixed at TrialDays; a paid tenant needs a future end date
+            SubscriptionStatus status;
+            string planCode;
+            DateTime subscriptionEnd;
+            if (dto.IsTrial)
+            {
+                status = SubscriptionStatus.Trial;
+                planCode = "TRIAL";
+                subscriptionEnd = DateTime.Today.AddDays(TrialDays - 1);
+            }
+            else
+            {
+                if (dto.SubscriptionEndDate is null || dto.SubscriptionEndDate.Value.Date < DateTime.Today)
+                    throw new InvalidOperationException("Subscription end date is required and cannot be in the past.");
+                status = SubscriptionStatus.Active;
+                planCode = string.IsNullOrWhiteSpace(dto.SubscriptionPlanCode) ? "CUSTOM" : dto.SubscriptionPlanCode;
+                subscriptionEnd = dto.SubscriptionEndDate.Value.Date;
+            }
+
             var slug = await GenerateUniqueSlugAsync(dto.BusinessName);
             var code = await GenerateNextCodeAsync();
+
+            // Everything below succeeds or fails together
+            await using var transaction = await _db.Database.BeginTransactionAsync();
 
             var tenant = new Tenant
             {
@@ -72,10 +97,12 @@ namespace POS.Entities.Services.Temancy
                 Address = dto.Address,
                 City = dto.City,
                 Slug = slug,
-                SubscriptionPlanCode = dto.SubscriptionPlanCode,
+                SubscriptionStatus = status,
+                SubscriptionPlanCode = planCode,
+                SubscriptionStartDate = DateTime.Now,
+                SubscriptionEndDate = subscriptionEnd,
                 MaxShops = dto.MaxShops,
-                MaxUsers = dto.MaxUsers,
-                SubscriptionStartDate = DateTime.Now
+                MaxUsers = dto.MaxUsers
             };
 
             var shop = new Shop
@@ -90,9 +117,10 @@ namespace POS.Entities.Services.Temancy
             };
             tenant.Shops.Add(shop);
 
+            User? adminUser = null;
             if (!string.IsNullOrWhiteSpace(dto.AdminUserName) && !string.IsNullOrWhiteSpace(dto.AdminPassword))
             {
-                var adminUser = new User
+                adminUser = new User
                 {
                     UserName = dto.AdminUserName,
                     FullName = string.IsNullOrWhiteSpace(dto.AdminFullName) ? dto.AdminUserName : dto.AdminFullName,
@@ -104,6 +132,26 @@ namespace POS.Entities.Services.Temancy
 
             _db.Tenants.Add(tenant);
             await _db.SaveChangesAsync();
+
+            var role = new Role { TenantId = tenant.Id, Name = SuperAdminRoleName };
+            _db.Roles.Add(role);
+            await _db.SaveChangesAsync();
+
+            var permissions = await _db.Permissions
+                .Select(p => new { p.Id, p.Name })
+                .ToListAsync();
+
+            foreach (var p in permissions.Where(p =>
+                         !PlatformOnlyPermissionPrefixes.Any(prefix => (p.Name ?? "").StartsWith(prefix))))
+            {
+                _db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = p.Id });
+            }
+
+            if (adminUser != null)
+                _db.UserRoles.Add(new UserRole { UserId = adminUser.Id, RoleId = role.Id });
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             return await GetByIdAsync(tenant.Id)
                 ?? throw new InvalidOperationException("Tenant was created but could not be reloaded.");
@@ -140,9 +188,26 @@ namespace POS.Entities.Services.Temancy
             var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == dto.TenantId && t.IsActive)
                 ?? throw new KeyNotFoundException($"Tenant {dto.TenantId} not found.");
 
-            tenant.SubscriptionStatus = (SubscriptionStatus)(int)dto.SubscriptionStatus;
+            var status = (SubscriptionStatus)(int)dto.SubscriptionStatus;
+
+            if (status == SubscriptionStatus.Trial)
+            {
+                // A trial can never run longer than TrialDays from the tenant's start date
+                var lastTrialDay = tenant.SubscriptionStartDate.Date.AddDays(TrialDays - 1);
+                if (dto.SubscriptionEndDate is null || dto.SubscriptionEndDate.Value.Date > lastTrialDay)
+                    throw new InvalidOperationException(
+                        $"A trial is limited to {TrialDays} days from the start date (until {lastTrialDay:dd MMM yyyy}).");
+            }
+            else if (status == SubscriptionStatus.Active
+                     && dto.SubscriptionEndDate.HasValue
+                     && dto.SubscriptionEndDate.Value.Date < DateTime.Today)
+            {
+                throw new InvalidOperationException("For an Active subscription the end date cannot be in the past.");
+            }
+
+            tenant.SubscriptionStatus = status;
             tenant.SubscriptionPlanCode = dto.SubscriptionPlanCode ?? tenant.SubscriptionPlanCode;
-            tenant.SubscriptionEndDate = dto.SubscriptionEndDate;
+            tenant.SubscriptionEndDate = dto.SubscriptionEndDate?.Date;
 
             await _db.SaveChangesAsync();
 
@@ -174,7 +239,8 @@ namespace POS.Entities.Services.Temancy
 
             var slug = baseSlug;
             var suffix = 1;
-            while (await _db.Tenants.AnyAsync(t => t.Slug == slug))
+            // IgnoreQueryFilters: soft-deleted tenants still own their slug in the unique index
+            while (await _db.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Slug == slug))
                 slug = $"{baseSlug}-{suffix++}";
 
             return slug;
@@ -182,8 +248,19 @@ namespace POS.Entities.Services.Temancy
 
         private async Task<string> GenerateNextCodeAsync()
         {
-            var count = await _db.Tenants.CountAsync();
-            return $"TEN-{(count + 1):D5}";
+            // Highest existing code including soft-deleted tenants (codes are fixed-width, so sorting as text works)
+            var lastCode = await _db.Tenants
+                .IgnoreQueryFilters()
+                .Where(t => t.Code.StartsWith("TEN-"))
+                .OrderByDescending(t => t.Code)
+                .Select(t => t.Code)
+                .FirstOrDefaultAsync();
+
+            var lastNumber = 0;
+            if (lastCode != null)
+                int.TryParse(lastCode.Substring(4), out lastNumber);
+
+            return $"TEN-{(lastNumber + 1):D5}";
         }
     }
 }

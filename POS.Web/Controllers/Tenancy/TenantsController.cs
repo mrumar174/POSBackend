@@ -77,6 +77,10 @@ namespace POS.Web.Controllers.Tenancy
             {
                 return NotFound(ex.Message);
             }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(ex.Message);
+            }
         }
 
         [HttpDelete("{id:int}")]

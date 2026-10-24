@@ -65,5 +65,7 @@ namespace POS.DTOs.Tenancy
         public string? AdminUserName { get; set; }
         public string? AdminFullName { get; set; }
         public string? AdminPassword { get; set; }
+        public bool IsTrial { get; set; }
+        public DateTime? SubscriptionEndDate { get; set; }
     }
 }

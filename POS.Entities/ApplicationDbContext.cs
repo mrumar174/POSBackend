@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Migrations;
 using POS.Entities.Catalog;
 using POS.Entities.Common;
@@ -279,10 +280,13 @@ namespace POS.Entities.Data
                         entry.Entity.AddedBy = userId;
                         entry.Entity.IsActive = true;
 
-                        if (entry.Entity is ITenantScoped tenantScoped && tenantScoped.TenantId == 0)
+                        if (entry.Entity is ITenantScoped tenantScoped
+                            && !IsAlreadyAssigned(entry, nameof(ITenantScoped.TenantId)))
                             tenantScoped.TenantId = _currentUser.TenantId;
 
-                        if (entry.Entity is IShopScoped shopScoped && shopScoped.ShopId == 0 && _currentUser.ShopId.HasValue)
+                        if (entry.Entity is IShopScoped shopScoped
+                            && !IsAlreadyAssigned(entry, nameof(IShopScoped.ShopId))
+                            && _currentUser.ShopId.HasValue)
                             shopScoped.ShopId = _currentUser.ShopId.Value;
                         break;
 
@@ -300,6 +304,15 @@ namespace POS.Entities.Data
                         break;
                 }
             }
+        }
+
+        // True when the key already has a real value, or a temporary one that EF replaces with the
+        // real id on insert (e.g. a Shop or User added through a brand-new Tenant object graph).
+        // Reading the entity property would wrongly show 0 in that case.
+        private static bool IsAlreadyAssigned(EntityEntry entry, string propertyName)
+        {
+            var property = entry.Property(propertyName);
+            return property.IsTemporary || (property.CurrentValue is int value && value != 0);
         }
     }
 }
