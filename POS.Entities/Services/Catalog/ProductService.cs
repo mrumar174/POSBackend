@@ -54,7 +54,10 @@ namespace POS.Entities.Services
 
                     Barcodes = p.Barcodes
                         .Select(b => b.Barcode)
-                        .ToList()
+                        .ToList(),
+                    TrackBatch = p.TrackBatch,
+                    TrackExpiry = p.TrackExpiry,
+                    ExpiryAlertDays = p.ExpiryAlertDays,
                 });
 
         public async Task<List<ProductDto>> GetAllAsync()
@@ -120,7 +123,11 @@ namespace POS.Entities.Services
             await ValidateBarcodesUniqueAsync(
                 dto.Barcodes,
                 excludingProductId: dto.Id);
+            await ValidateTrackingChangeAsync(product, dto.TrackBatch, dto.TrackExpiry);
 
+            product.TrackBatch = dto.TrackBatch;
+            product.TrackExpiry = dto.TrackExpiry;
+            product.ExpiryAlertDays = dto.TrackExpiry ? dto.ExpiryAlertDays : null;
             // ProductCode is immutable after creation.
             // dto.ProductCode is intentionally ignored.
             product.Name = dto.Name;
@@ -132,11 +139,7 @@ namespace POS.Entities.Services
             product.MinimumStock = dto.MinimumStock;
             product.Description = dto.Description;
 
-            // Remove old barcodes.
-            _db.ProductBarcodes.RemoveRange(product.Barcodes);
-
-            // Add new barcodes.
-            product.Barcodes = BuildBarcodeEntities(dto.Barcodes);
+            SyncBarcodes(product, dto.Barcodes);
 
             await _db.SaveChangesAsync();
 
@@ -386,6 +389,48 @@ namespace POS.Entities.Services
             await _db.SaveChangesAsync();
 
             return await GetByIdAsync(product.Id) ?? throw new InvalidOperationException("Failed to reload product.");
+        }
+        // Turning tracking OFF while batches still hold stock would let batch balances drift.
+        private async Task ValidateTrackingChangeAsync(Product product, bool trackBatch, bool trackExpiry)
+        {
+            var disabling = (product.TrackBatch && !trackBatch) || (product.TrackExpiry && !trackExpiry);
+            if (!disabling) return;
+
+            var hasBatchStock = await _db.StockTransactions
+                .Where(t => t.ProductId == product.Id && t.BatchId != null)
+                .GroupBy(t => t.BatchId)
+                .AnyAsync(g => g.Sum(t => t.QuantityIn - t.QuantityOut) > 0);
+
+            if (hasBatchStock)
+                throw new InvalidOperationException(
+                    "Cannot turn off batch/expiry tracking while batches still hold stock.");
+        }
+        // Keeps unchanged barcodes, removes dropped ones, adds new ones.
+        private void SyncBarcodes(Product product, List<string>? input)
+        {
+            var wanted = (input ?? new List<string>())
+                .Where(b => !string.IsNullOrWhiteSpace(b))
+                .Select(b => b.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var removed = product.Barcodes
+                .Where(b => !wanted.Contains(b.Barcode, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            _db.ProductBarcodes.RemoveRange(removed);
+
+            var kept = product.Barcodes.Except(removed).ToList();
+
+            for (var i = 0; i < wanted.Count; i++)
+            {
+                var existing = kept.FirstOrDefault(b =>
+                    string.Equals(b.Barcode, wanted[i], StringComparison.OrdinalIgnoreCase));
+
+                if (existing != null)
+                    existing.IsPrimary = i == 0;
+                else
+                    product.Barcodes.Add(new ProductBarcode { Barcode = wanted[i], IsPrimary = i == 0 });
+            }
         }
     }
 }

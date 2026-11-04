@@ -69,11 +69,8 @@ namespace POS.Entities.Services.Reports
                     NetPurchases = g.Sum(x => x.GrandTotal)
                 });
 
-            var dailyBreakdown = EnumerateDays(from, toExclusive)
-                .Select(d => dailyGroups.TryGetValue(d, out var point)
-                    ? point
-                    : new DailyPurchasePointDto { Date = d, InvoiceCount = 0, NetPurchases = 0 })
-                .ToList();
+            // Only days that actually have purchases (no zero-filled days)
+            var dailyBreakdown = dailyGroups.Values.OrderBy(p => p.Date).ToList();
 
             return new PurchaseSummaryReportDto
             {
@@ -181,9 +178,38 @@ namespace POS.Entities.Services.Reports
                 .ToDictionaryAsync(x => x.ProductId, x => x.OnHand);
         }
 
+        /// <summary>
+        /// Quantity per product that sits in batches whose expiry date has already passed.
+        /// Expired stock is still physically on hand, but it cannot be sold.
+        /// Products without batch/expiry tracking never appear here.
+        /// </summary>
+        private async Task<Dictionary<int, decimal>> GetExpiredQuantityByProductAsync()
+        {
+            var today = DateTime.Today;
+
+            var perBatch = await _db.StockTransactions
+                .Where(s => s.BatchId != null
+                            && s.Batch != null
+                            && s.Batch.ExpiryDate != null
+                            && s.Batch.ExpiryDate < today)
+                .GroupBy(s => new { s.ProductId, s.BatchId })
+                .Select(g => new
+                {
+                    g.Key.ProductId,
+                    Qty = g.Sum(x => x.QuantityIn) - g.Sum(x => x.QuantityOut)
+                })
+                .ToListAsync();
+
+            return perBatch
+                .Where(x => x.Qty > 0)
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+        }
+
         public async Task<StockValuationSummaryDto> GetStockValuationAsync(int? categoryId)
         {
             var onHandByProduct = await GetOnHandByProductAsync();
+            var expiredByProduct = await GetExpiredQuantityByProductAsync();
 
             var productsQuery = _db.Products.Include(p => p.Category).AsQueryable();
             if (categoryId.HasValue)
@@ -204,6 +230,7 @@ namespace POS.Entities.Services.Reports
             var items = products.Select(p =>
             {
                 var onHand = onHandByProduct.GetValueOrDefault(p.Id, 0);
+                var expired = expiredByProduct.GetValueOrDefault(p.Id, 0);
                 var valueAtCost = onHand * p.PurchasePrice;
                 var valueAtSale = onHand * p.SalePrice;
                 return new StockValuationReportRowDto
@@ -217,7 +244,9 @@ namespace POS.Entities.Services.Reports
                     UnitSalePrice = p.SalePrice,
                     ValueAtCost = valueAtCost,
                     ValueAtSalePrice = valueAtSale,
-                    PotentialProfit = valueAtSale - valueAtCost
+                    PotentialProfit = valueAtSale - valueAtCost,
+                    ExpiredQuantity = expired,                       // NEW
+                    ExpiredValueAtCost = expired * p.PurchasePrice   // NEW
                 };
             })
             .Where(i => i.QuantityOnHand != 0) // skip products with zero stock — not useful in a valuation report
@@ -229,6 +258,7 @@ namespace POS.Entities.Services.Reports
                 TotalValueAtCost = items.Sum(i => i.ValueAtCost),
                 TotalValueAtSalePrice = items.Sum(i => i.ValueAtSalePrice),
                 TotalPotentialProfit = items.Sum(i => i.PotentialProfit),
+                TotalExpiredValueAtCost = items.Sum(i => i.ExpiredValueAtCost), // NEW
                 Items = items
             };
         }
@@ -236,6 +266,7 @@ namespace POS.Entities.Services.Reports
         public async Task<List<LowStockReportRowDto>> GetLowStockAsync(int? categoryId)
         {
             var onHandByProduct = await GetOnHandByProductAsync();
+            var expiredByProduct = await GetExpiredQuantityByProductAsync();
 
             var productsQuery = _db.Products.Include(p => p.Category).AsQueryable();
             if (categoryId.HasValue)
@@ -245,9 +276,25 @@ namespace POS.Entities.Services.Reports
                 .Select(p => new { p.Id, p.Name, p.ProductCode, CategoryName = p.Category.Name, p.MinimumStock })
                 .ToListAsync();
 
+            // Low stock is judged on SELLABLE quantity = on hand minus expired batches.
             var lowStockProducts = products
-                .Select(p => new { p.Id, p.Name, p.ProductCode, p.CategoryName, p.MinimumStock, OnHand = onHandByProduct.GetValueOrDefault(p.Id, 0) })
-                .Where(p => p.OnHand <= p.MinimumStock)
+                .Select(p =>
+                {
+                    var onHand = onHandByProduct.GetValueOrDefault(p.Id, 0);
+                    var expired = expiredByProduct.GetValueOrDefault(p.Id, 0);
+                    return new
+                    {
+                        p.Id,
+                        p.Name,
+                        p.ProductCode,
+                        p.CategoryName,
+                        p.MinimumStock,
+                        OnHand = onHand,
+                        Expired = expired,
+                        Sellable = onHand - expired
+                    };
+                })
+                .Where(p => p.Sellable <= p.MinimumStock)
                 .ToList();
 
             var result = new List<LowStockReportRowDto>();
@@ -261,7 +308,7 @@ namespace POS.Entities.Services.Reports
                     .Select(d => new { d.Purchase.PurchaseDate, d.Purchase.Supplier.Name })
                     .FirstOrDefaultAsync();
 
-                var suggestedReorder = Math.Max(0, (p.MinimumStock * 2) - p.OnHand);
+                var suggestedReorder = Math.Max(0, (p.MinimumStock * 2) - p.Sellable);
 
                 result.Add(new LowStockReportRowDto
                 {
@@ -270,6 +317,8 @@ namespace POS.Entities.Services.Reports
                     ProductCode = p.ProductCode,
                     CategoryName = p.CategoryName,
                     QuantityOnHand = p.OnHand,
+                    ExpiredQuantity = p.Expired,        // NEW
+                    SellableQuantity = p.Sellable,      // NEW
                     MinimumStock = p.MinimumStock,
                     SuggestedReorderQuantity = suggestedReorder,
                     LastPurchaseDate = lastPurchaseLine?.PurchaseDate,
@@ -277,7 +326,7 @@ namespace POS.Entities.Services.Reports
                 });
             }
 
-            return result.OrderBy(r => r.QuantityOnHand - r.MinimumStock).ToList(); // most urgently low first
+            return result.OrderBy(r => r.SellableQuantity - r.MinimumStock).ToList(); // most urgently low first
         }
 
         public async Task<List<StockMovementRowDto>> GetStockMovementAsync(int productId, DateTime? fromDate, DateTime? toDate)
@@ -305,6 +354,19 @@ namespace POS.Entities.Services.Reports
             var purchaseReturnNos = await _db.PurchaseReturns.Where(r => purchaseReturnIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.ReturnNo);
             // Add Sale/SaleReturn/StockAdjustment lookups here once those modules exist, following the same pattern.
 
+            // NEW: resolve batch number + expiry for transactions that belong to a batch
+            var batchIds = transactionsInRange
+                .Where(t => t.BatchId.HasValue)
+                .Select(t => t.BatchId!.Value)
+                .Distinct()
+                .ToList();
+
+            var batchRows = await _db.ProductBatches
+                .Where(b => batchIds.Contains(b.Id))
+                .Select(b => new { b.Id, b.BatchNo, b.ExpiryDate })
+                .ToListAsync();
+            var batchById = batchRows.ToDictionary(b => b.Id);
+
             var result = new List<StockMovementRowDto>();
             foreach (var t in transactionsInRange)
             {
@@ -317,6 +379,14 @@ namespace POS.Entities.Services.Reports
                     _ => null
                 };
 
+                string? batchNo = null;
+                DateTime? batchExpiry = null;
+                if (t.BatchId.HasValue && batchById.TryGetValue(t.BatchId.Value, out var batch))
+                {
+                    batchNo = batch.BatchNo;
+                    batchExpiry = batch.ExpiryDate;
+                }
+
                 result.Add(new StockMovementRowDto
                 {
                     TransactionDate = t.TransactionDate,
@@ -325,7 +395,9 @@ namespace POS.Entities.Services.Reports
                     QuantityIn = t.QuantityIn,
                     QuantityOut = t.QuantityOut,
                     RunningBalance = runningBalance,
-                    Remarks = t.Remarks
+                    Remarks = t.Remarks,
+                    BatchNo = batchNo,           // NEW
+                    ExpiryDate = batchExpiry     // NEW
                 });
             }
 
@@ -367,6 +439,7 @@ namespace POS.Entities.Services.Reports
                     TaxCollected = salesTaxByDay.GetValueOrDefault(d, 0),
                     TaxPaid = purchaseTaxByDay.GetValueOrDefault(d, 0)
                 })
+                .Where(d => d.TaxCollected != 0 || d.TaxPaid != 0) // hide days with no tax activity
                 .ToList();
 
             var totalCollected = dailyBreakdown.Sum(d => d.TaxCollected);
@@ -387,6 +460,9 @@ namespace POS.Entities.Services.Reports
         // REQUIRES SALES MODULE — references Sale/SaleDetail/User.
         // Remove everything below this point (and the matching interface
         // + controller methods) if those entities don't exist yet.
+        //
+        // Batch note: tracked products are sold as one SaleDetail per batch.
+        // These reports group by product and sum, so totals are unaffected.
         // ============================================================
 
         public async Task<SalesSummaryReportDto> GetSalesSummaryAsync(DateTime? fromDate, DateTime? toDate)
@@ -407,11 +483,8 @@ namespace POS.Entities.Services.Reports
                     NetSales = g.Sum(x => x.GrandTotal)
                 });
 
-            var dailyBreakdown = EnumerateDays(from, toExclusive)
-                .Select(d => dailyGroups.TryGetValue(d, out var point)
-                    ? point
-                    : new DailySalesPointDto { Date = d, InvoiceCount = 0, NetSales = 0 })
-                .ToList();
+            // Only days that actually have sales (no zero-filled days)
+            var dailyBreakdown = dailyGroups.Values.OrderBy(p => p.Date).ToList();
 
             var totalInvoices = sales.Count;
             var totalNetSales = sales.Sum(s => s.GrandTotal);
@@ -617,8 +690,10 @@ namespace POS.Entities.Services.Reports
                 .GroupBy(e => e.ExpenseDate.Date)
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
 
-            var dailyBreakdown = EnumerateDays(from, toExclusive)
-                .Select(d => new DailyExpensePointDto { Date = d, Amount = dailyGroups.GetValueOrDefault(d, 0) })
+            // Only days that actually have expenses (no zero-filled days)
+            var dailyBreakdown = dailyGroups
+                .OrderBy(g => g.Key)
+                .Select(g => new DailyExpensePointDto { Date = g.Key, Amount = g.Value })
                 .ToList();
 
             return new ExpenseSummaryReportDto

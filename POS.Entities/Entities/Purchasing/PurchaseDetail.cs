@@ -1,5 +1,6 @@
 using POS.Entities.Catalog;
 using POS.Entities.Common;
+using POS.Entities.Entities.Catalog;
 
 namespace POS.Entities.Purchasing
 {
@@ -19,5 +20,7 @@ namespace POS.Entities.Purchasing
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal Total { get; set; }
+        public int? BatchId { get; set; }
+        public ProductBatch? Batch { get; set; }
     }
 }

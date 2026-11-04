@@ -48,6 +48,8 @@ namespace POS.DTOs.Reports
         public decimal ValueAtCost { get; set; }
         public decimal ValueAtSalePrice { get; set; }
         public decimal PotentialProfit { get; set; }
+        public decimal ExpiredQuantity { get; set; }
+        public decimal ExpiredValueAtCost { get; set; }
     }
 
     public class StockValuationSummaryDto
@@ -55,6 +57,7 @@ namespace POS.DTOs.Reports
         public decimal TotalValueAtCost { get; set; }
         public decimal TotalValueAtSalePrice { get; set; }
         public decimal TotalPotentialProfit { get; set; }
+        public decimal TotalExpiredValueAtCost { get; set; }
         public List<StockValuationReportRowDto> Items { get; set; } = new();
     }
 
@@ -67,6 +70,8 @@ namespace POS.DTOs.Reports
         public decimal QuantityOut { get; set; }
         public decimal RunningBalance { get; set; }
         public string? Remarks { get; set; }
+        public string? BatchNo { get; set; }
+        public DateTime? ExpiryDate { get; set; }
     }
 
     public class LowStockReportRowDto
@@ -80,6 +85,8 @@ namespace POS.DTOs.Reports
         public decimal SuggestedReorderQuantity { get; set; }
         public DateTime? LastPurchaseDate { get; set; }
         public string? PreferredSupplierName { get; set; }
+        public decimal ExpiredQuantity { get; set; }
+        public decimal SellableQuantity { get; set; }
     }
 
     public class SupplierDueReportRowDto

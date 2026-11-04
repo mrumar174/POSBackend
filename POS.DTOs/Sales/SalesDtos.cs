@@ -13,6 +13,9 @@ namespace POS.DTOs.Sales
         public decimal Discount { get; set; }
         public decimal Tax { get; set; }
         public decimal Total { get; set; }
+        public int? BatchId { get; set; }
+        public string? BatchNo { get; set; }
+        public DateTime? ExpiryDate { get; set; }
     }
 
     public class CreateSaleDetailDto

@@ -7,6 +7,7 @@ using POS.Entities.Common;
 using POS.Entities.Data;
 using POS.Entities.Entities.Tenancy;
 using POS.Entities.IServices;
+using POS.Entities.IServices.Backup;
 using POS.Entities.IServices.Catalog;
 using POS.Entities.IServices.Dashboard;
 using POS.Entities.IServices.Finance;
@@ -18,6 +19,7 @@ using POS.Entities.IServices.Sales;
 using POS.Entities.IServices.Settings;
 using POS.Entities.IServices.Tenancy;
 using POS.Entities.Services;
+using POS.Entities.Services.Backup;
 using POS.Entities.Services.Catalog;
 using POS.Entities.Services.Dashboard;
 using POS.Entities.Services.Finance;
@@ -26,6 +28,7 @@ using POS.Entities.Services.Reports;
 using POS.Entities.Services.Sales;
 using POS.Entities.Services.Settings;
 using POS.Entities.Services.Temancy;
+using POS.Web.BackgroundServices;
 using POS.Web.Services;
 using System.Text;
 
@@ -73,6 +76,9 @@ builder.Services.AddScoped<IExpenseCategoryService, ExpenseCategoryService>();
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IDailyCashClosingService, DailyCashClosingService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IBatchService, BatchService>();
+builder.Services.AddSingleton<IBackupService, BackupService>();   // singleton: job progress lives in memory
+builder.Services.AddHostedService<AutoBackupHostedService>();
 // ---------------------------------------------------------------
 // JWT Authentication — required because controllers use [Authorize].
 // ICurrentUserService reads tenant_id/shop_id claims from this token.

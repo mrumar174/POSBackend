@@ -1,4 +1,5 @@
 using POS.Entities.Common;
+using POS.Entities.Entities.Catalog;
 using POS.Entities.Identity;
 using POS.Entities.Inventory;
 using POS.Entities.Purchasing;
@@ -34,8 +35,12 @@ namespace POS.Entities.Catalog
         public decimal MinimumStock { get; set; }
 
         public string? Description { get; set; }
-
+        public bool TrackBatch { get; set; }
+        public bool TrackExpiry { get; set; }
+        /// <summary>Warn this many days before expiry. null = system default (30).</summary>
+        public int? ExpiryAlertDays { get; set; }
         // Navigation
+        public ICollection<ProductBatch> Batches { get; set; } = new List<ProductBatch>();
         public ICollection<ProductBarcode> Barcodes { get; set; } = new List<ProductBarcode>();
         public ICollection<PurchaseDetail> PurchaseDetails { get; set; } = new List<PurchaseDetail>();
         public ICollection<SaleDetail> SaleDetails { get; set; } = new List<SaleDetail>();

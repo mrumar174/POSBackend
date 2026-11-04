@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using POS.DTOs.Catalog;
 using POS.DTOs.Dashboard;
 using POS.Entities.Common;
 using POS.Entities.Data;
@@ -11,11 +12,12 @@ namespace POS.Entities.Services.Dashboard
     {
         private readonly ApplicationDbContext _db;
         private readonly ICurrentUserService _currentUser;
-
-        public DashboardService(ApplicationDbContext db, ICurrentUserService currentUser)
+        private readonly IBatchService _batchService;
+        public DashboardService(ApplicationDbContext db, ICurrentUserService currentUser, IBatchService batchService)
         {
             _db = db;
             _currentUser = currentUser;
+            _batchService = batchService;
         }
 
         public async Task<DashboardDto> GetDashboardDataAsync()
@@ -75,6 +77,11 @@ namespace POS.Entities.Services.Dashboard
                     QuantityOnHand = p.QoH,
                     MinimumStock = p.MinimumStock
                 }).ToList();
+
+            // 2b. Expiry KPIs (batches that still hold stock)
+            var expiryRows = await _batchService.GetExpiryReportAsync(withinDays: null, includeExpired: true);
+            dto.Kpis.ExpiredBatchCount = expiryRows.Count(r => r.Status == BatchExpiryStatus.Expired);
+            dto.Kpis.NearExpiryBatchCount = expiryRows.Count(r => r.Status == BatchExpiryStatus.NearExpiry);
 
             // 3. Supplier Dues
             var supplierDues = await _db.Purchases

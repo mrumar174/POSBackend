@@ -1,6 +1,7 @@
 using POS.DTOs.Common;
 using POS.Entities.Catalog;
 using POS.Entities.Common;
+using POS.Entities.Entities.Catalog;
 
 public class StockTransaction : ShopAuditableEntity
 {
@@ -15,4 +16,6 @@ public class StockTransaction : ShopAuditableEntity
     public decimal QuantityOut { get; set; }
     public decimal UnitCost { get; set; }
     public string? Remarks { get; set; }
+    public int? BatchId { get; set; }
+    public ProductBatch? Batch { get; set; }
 }

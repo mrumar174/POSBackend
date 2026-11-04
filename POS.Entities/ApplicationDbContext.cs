@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Migrations;
 using POS.Entities.Catalog;
 using POS.Entities.Common;
+using POS.Entities.Entities.Catalog;
 using POS.Entities.Finance;
 using POS.Entities.Identity;
 using POS.Entities.Inventory;
@@ -75,9 +76,24 @@ namespace POS.Entities.Data
         // Settings
         public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
         public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
-
+        public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<ProductBatch>(e =>
+            {
+                e.Property(x => x.BatchNo).HasMaxLength(50);
+                e.HasOne(x => x.Product).WithMany(p => p.Batches)
+                    .HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.ShopId, x.ProductId, x.BatchNo, x.ExpiryDate }).IsUnique();
+                e.HasIndex(x => x.ExpiryDate);
+            });
+
+            modelBuilder.Entity<StockTransaction>().HasOne(x => x.Batch).WithMany()
+                .HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<PurchaseDetail>().HasOne(x => x.Batch).WithMany()
+                .HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<SaleDetail>().HasOne(x => x.Batch).WithMany()
+                .HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
             base.OnModelCreating(modelBuilder);
 
             // ---------------------------------------------------------------
@@ -179,7 +195,7 @@ namespace POS.Entities.Data
             modelBuilder.Entity<User>().HasIndex(x => new { x.TenantId, x.UserName }).IsUnique();
             modelBuilder.Entity<Product>().HasIndex(x => new { x.TenantId, x.ProductCode }).IsUnique();
             modelBuilder.Entity<ProductBarcode>().HasIndex(x => new { x.TenantId, x.Barcode }).IsUnique();
-
+            modelBuilder.Entity<ProductBarcode>().HasIndex(b => new { b.TenantId, b.Barcode }).IsUnique().HasFilter("[DeletedOn] IS NULL");
             modelBuilder.Entity<Purchase>().HasIndex(x => new { x.ShopId, x.InvoiceNo }).IsUnique();
             modelBuilder.Entity<Sale>().HasIndex(x => new { x.ShopId, x.InvoiceNo }).IsUnique();
             modelBuilder.Entity<PurchaseReturn>().HasIndex(x => new { x.ShopId, x.ReturnNo }).IsUnique();
