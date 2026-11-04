@@ -145,6 +145,9 @@ namespace POS.Entities.Data.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("ExpiryAlertDays")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -167,6 +170,12 @@ namespace POS.Entities.Data.Migrations
 
                     b.Property<int>("TenantId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("TrackBatch")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("TrackExpiry")
+                        .HasColumnType("bit");
 
                     b.Property<int>("UnitId")
                         .HasColumnType("int");
@@ -238,7 +247,8 @@ namespace POS.Entities.Data.Migrations
                     b.HasIndex("ProductId");
 
                     b.HasIndex("TenantId", "Barcode")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[DeletedOn] IS NULL");
 
                     b.ToTable("ProductBarcodes");
                 });
@@ -292,6 +302,67 @@ namespace POS.Entities.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Units");
+                });
+
+            modelBuilder.Entity("POS.Entities.Entities.Catalog.ProductBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AddedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("AddedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("BatchNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ManufactureDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ShopId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiryDate");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ShopId", "ProductId", "BatchNo", "ExpiryDate")
+                        .IsUnique()
+                        .HasFilter("[BatchNo] IS NOT NULL AND [ExpiryDate] IS NOT NULL");
+
+                    b.ToTable("ProductBatches");
                 });
 
             modelBuilder.Entity("POS.Entities.Finance.CashTransaction", b =>
@@ -966,6 +1037,9 @@ namespace POS.Entities.Data.Migrations
                     b.Property<DateTime>("AddedOn")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("DeletedBy")
                         .HasColumnType("int");
 
@@ -1017,6 +1091,8 @@ namespace POS.Entities.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("ProductId");
 
@@ -1394,6 +1470,9 @@ namespace POS.Entities.Data.Migrations
                     b.Property<DateTime>("AddedOn")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("DeletedBy")
                         .HasColumnType("int");
 
@@ -1443,6 +1522,8 @@ namespace POS.Entities.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("ProductId");
 
@@ -1884,6 +1965,9 @@ namespace POS.Entities.Data.Migrations
                     b.Property<DateTime>("AddedOn")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("DeletedBy")
                         .HasColumnType("int");
 
@@ -1940,6 +2024,8 @@ namespace POS.Entities.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BatchId");
+
                     b.HasIndex("ProductId");
 
                     b.ToTable("StockTransactions");
@@ -1975,6 +2061,17 @@ namespace POS.Entities.Data.Migrations
                 {
                     b.HasOne("POS.Entities.Catalog.Product", "Product")
                         .WithMany("Barcodes")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("POS.Entities.Entities.Catalog.ProductBatch", b =>
+                {
+                    b.HasOne("POS.Entities.Catalog.Product", "Product")
+                        .WithMany("Batches")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -2100,6 +2197,11 @@ namespace POS.Entities.Data.Migrations
 
             modelBuilder.Entity("POS.Entities.Purchasing.PurchaseDetail", b =>
                 {
+                    b.HasOne("POS.Entities.Entities.Catalog.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("POS.Entities.Catalog.Product", "Product")
                         .WithMany("PurchaseDetails")
                         .HasForeignKey("ProductId")
@@ -2111,6 +2213,8 @@ namespace POS.Entities.Data.Migrations
                         .HasForeignKey("PurchaseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Product");
 
@@ -2192,6 +2296,11 @@ namespace POS.Entities.Data.Migrations
 
             modelBuilder.Entity("POS.Entities.Sales.SaleDetail", b =>
                 {
+                    b.HasOne("POS.Entities.Entities.Catalog.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("POS.Entities.Catalog.Product", "Product")
                         .WithMany("SaleDetails")
                         .HasForeignKey("ProductId")
@@ -2203,6 +2312,8 @@ namespace POS.Entities.Data.Migrations
                         .HasForeignKey("SaleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Product");
 
@@ -2270,11 +2381,18 @@ namespace POS.Entities.Data.Migrations
 
             modelBuilder.Entity("StockTransaction", b =>
                 {
+                    b.HasOne("POS.Entities.Entities.Catalog.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("POS.Entities.Catalog.Product", "Product")
                         .WithMany("StockTransactions")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Product");
                 });
@@ -2292,6 +2410,8 @@ namespace POS.Entities.Data.Migrations
             modelBuilder.Entity("POS.Entities.Catalog.Product", b =>
                 {
                     b.Navigation("Barcodes");
+
+                    b.Navigation("Batches");
 
                     b.Navigation("PurchaseDetails");
 

@@ -16,12 +16,20 @@ namespace POS.Entities.Services.Sales
         private readonly ApplicationDbContext _db;
         private readonly ICurrentUserService _currentUser;
         private readonly IStockService _stockService;
+        private readonly IBatchService _batchService;
 
-        public SaleService(ApplicationDbContext db, ICurrentUserService currentUser, IStockService stockService)
+
+        public SaleService(
+            ApplicationDbContext db, 
+            ICurrentUserService currentUser, 
+            IStockService stockService,
+            IBatchService batchService
+            )
         {
             _db = db;
             _currentUser = currentUser;
             _stockService = stockService;
+            _batchService = batchService;
         }
 
         private IQueryable<SaleDto> ProjectToDto() =>
@@ -57,7 +65,10 @@ namespace POS.Entities.Services.Sales
                         DiscountValue = d.DiscountValue,
                         Discount = d.Discount,
                         Tax = d.Tax,
-                        Total = d.Total
+                        Total = d.Total,
+                        BatchId = d.BatchId,
+                        BatchNo = d.Batch != null ? d.Batch.BatchNo : null,
+                        ExpiryDate = d.Batch != null ? d.Batch.ExpiryDate : null,
                     }).ToList()
                 });
 
@@ -92,6 +103,8 @@ namespace POS.Entities.Services.Sales
                     }
                 }
 
+                var slotsByProduct = await AllocateBatchesAsync(productDemands.Select(d => (d.ProductId, d.TotalQuantity)));
+
                 var (subTotal, grandTotal) = CalculateTotals(dto.Items, dto.DiscountType, dto.DiscountValue, dto.Tax, out var headerDiscount);
 
                 var sale = new Sale
@@ -114,27 +127,15 @@ namespace POS.Entities.Services.Sales
 
                 foreach (var item in dto.Items)
                 {
-                    var baseAmount = item.Quantity * item.SalePrice;
-                    var itemDiscount = ComputeDiscountAmount(item.DiscountType, item.DiscountValue, baseAmount, item.Quantity);
-                    var lineTotal = Math.Max(0, baseAmount - itemDiscount + item.Tax);
-
-                    sale.SaleDetails.Add(new SaleDetail
-                    {
-                        ProductId = item.ProductId,
-                        Quantity = item.Quantity,
-                        SalePrice = item.SalePrice,
-                        DiscountType = item.DiscountType,
-                        DiscountValue = item.DiscountValue,
-                        Discount = itemDiscount,
-                        Tax = item.Tax,
-                        Total = lineTotal
-                    });
+                    var allocations = TakeAllocations(slotsByProduct[item.ProductId], item.Quantity);
+                    foreach (var detail in BuildDetails(item, allocations))
+                        sale.SaleDetails.Add(detail);
                 }
 
                 _db.Sales.Add(sale);
                 await _db.SaveChangesAsync();
 
-                ApplyStockTransactions(sale, dto.Items);
+                ApplyStockTransactions(sale);
 
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -179,12 +180,19 @@ namespace POS.Entities.Services.Sales
                 foreach (var demand in productDemands)
                 {
                     var currentStock = await _stockService.GetProductStockAsync(demand.ProductId);
+
                     if (demand.TotalQuantity > currentStock)
                     {
                         var productName = await _db.Products.Where(p => p.Id == demand.ProductId).Select(p => p.Name).FirstOrDefaultAsync();
                         throw new InvalidOperationException($"Insufficient stock for '{productName}'. Available: {currentStock:0.###}, Requested: {demand.TotalQuantity:0.###}");
                     }
                 }
+
+                // NEW: allocate batches (FEFO) once per product, using total demand.
+                // Old stock rows are already removed and saved above, so the quantities
+                // from this sale's previous version are available to be re-allocated.
+                var slotsByProduct = await AllocateBatchesAsync(
+                    productDemands.Select(d => (d.ProductId, d.TotalQuantity)));
 
                 _db.SaleDetails.RemoveRange(sale.SaleDetails);
                 sale.SaleDetails.Clear();
@@ -207,26 +215,14 @@ namespace POS.Entities.Services.Sales
 
                 foreach (var item in dto.Items)
                 {
-                    var baseAmount = item.Quantity * item.SalePrice;
-                    var itemDiscount = ComputeDiscountAmount(item.DiscountType, item.DiscountValue, baseAmount, item.Quantity);
-                    var lineTotal = Math.Max(0, baseAmount - itemDiscount + item.Tax);
-
-                    sale.SaleDetails.Add(new SaleDetail
-                    {
-                        ProductId = item.ProductId,
-                        Quantity = item.Quantity,
-                        SalePrice = item.SalePrice,
-                        DiscountType = item.DiscountType,
-                        DiscountValue = item.DiscountValue,
-                        Discount = itemDiscount,
-                        Tax = item.Tax,
-                        Total = lineTotal
-                    });
+                    var allocations = TakeAllocations(slotsByProduct[item.ProductId], item.Quantity);
+                    foreach (var detail in BuildDetails(item, allocations))
+                        sale.SaleDetails.Add(detail);
                 }
 
                 await _db.SaveChangesAsync();
 
-                ApplyStockTransactions(sale, dto.Items);
+                ApplyStockTransactions(sale);
 
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -272,16 +268,17 @@ namespace POS.Entities.Services.Sales
             }
         }
 
-        private void ApplyStockTransactions(Sale sale, List<CreateSaleDetailDto> items)
+        private void ApplyStockTransactions(Sale sale)
         {
-            foreach (var item in items)
+            foreach (var d in sale.SaleDetails)
             {
                 _db.StockTransactions.Add(new StockTransaction
                 {
-                    ProductId = item.ProductId,
+                    ProductId = d.ProductId,
+                    BatchId = d.BatchId,
                     TransactionType = StockTransactionType.SALE,
                     QuantityIn = 0,
-                    QuantityOut = item.Quantity,
+                    QuantityOut = d.Quantity,
                     ReferenceType = "Sale",
                     ReferenceId = sale.Id,
                     TransactionDate = sale.SaleDate,
@@ -362,6 +359,95 @@ namespace POS.Entities.Services.Sales
             }
 
             return $"{prefix}-{(maxNumber + 1):D5}";
+        }
+
+        // Allocate once per PRODUCT (total demand), not per line. Otherwise two lines of the
+        // same product would both claim the same batch, because nothing is saved yet.
+        private async Task<Dictionary<int, List<AllocationSlot>>> AllocateBatchesAsync(
+            IEnumerable<(int ProductId, decimal TotalQuantity)> demands)
+        {
+            var list = demands.ToList();
+            var ids = list.Select(d => d.ProductId).ToList();
+            var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+
+            var result = new Dictionary<int, List<AllocationSlot>>();
+            foreach (var d in list)
+            {
+                if (!products.TryGetValue(d.ProductId, out var product))
+                    throw new InvalidOperationException($"Product {d.ProductId} not found.");
+
+                var allocations = await _batchService.AllocateFefoAsync(product, d.TotalQuantity);
+                result[d.ProductId] = allocations
+                    .Select(a => new AllocationSlot { BatchId = a.BatchId, Remaining = a.Quantity })
+                    .ToList();
+            }
+            return result;
+        }
+
+        // Hand each sale line its share of the product's allocation, in FEFO order.
+        private static List<BatchAllocation> TakeAllocations(List<AllocationSlot> slots, decimal quantity)
+        {
+            var result = new List<BatchAllocation>();
+            foreach (var s in slots)
+            {
+                if (quantity <= 0) break;
+                if (s.Remaining <= 0) continue;
+
+                var take = Math.Min(s.Remaining, quantity);
+                s.Remaining -= take;
+                quantity -= take;
+                result.Add(new BatchAllocation(s.BatchId, take));
+            }
+            return result;
+        }
+
+        // One sale line can span several batches, so it becomes one SaleDetail per allocation.
+        // Flat discount and tax are split proportionally (the last piece takes the remainder, so
+        // the line still adds up exactly). Percentage and per-piece discounts apply as they are.
+        private static List<SaleDetail> BuildDetails(CreateSaleDetailDto item, List<BatchAllocation> allocations)
+        {
+            var details = new List<SaleDetail>();
+            var taxLeft = item.Tax;
+            var flatLeft = item.DiscountValue;
+
+            for (var i = 0; i < allocations.Count; i++)
+            {
+                var a = allocations[i];
+                var last = i == allocations.Count - 1;
+                var ratio = a.Quantity / item.Quantity;
+
+                var tax = last ? taxLeft : Math.Round(item.Tax * ratio, 2);
+                taxLeft -= tax;
+
+                var discountValue = item.DiscountValue;
+                if (item.DiscountType == DiscountType.Flat)
+                {
+                    discountValue = last ? flatLeft : Math.Round(item.DiscountValue * ratio, 2);
+                    flatLeft -= discountValue;
+                }
+
+                var baseAmount = a.Quantity * item.SalePrice;
+                var discount = ComputeDiscountAmount(item.DiscountType, discountValue, baseAmount, a.Quantity);
+
+                details.Add(new SaleDetail
+                {
+                    ProductId = item.ProductId,
+                    BatchId = a.BatchId,
+                    Quantity = a.Quantity,
+                    SalePrice = item.SalePrice,
+                    DiscountType = item.DiscountType,
+                    DiscountValue = discountValue,
+                    Discount = discount,
+                    Tax = tax,
+                    Total = Math.Max(0, baseAmount - discount + tax)
+                });
+            }
+            return details;
+        }
+        private sealed class AllocationSlot
+        {
+            public int? BatchId { get; init; }
+            public decimal Remaining { get; set; }
         }
     }
 }

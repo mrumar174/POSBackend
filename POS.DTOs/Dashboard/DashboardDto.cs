@@ -34,11 +34,11 @@ namespace POS.DTOs.Dashboard
         public int TotalProductsCount { get; set; }
         public int LowStockCount { get; set; }
         public int OutOfStockCount { get; set; }
-
         public decimal TotalSupplierDue { get; set; }
         public int SuppliersWithDueCount { get; set; }
-
         public decimal? TodayExpenses { get; set; }
+        public int ExpiredBatchCount { get; set; }
+        public int NearExpiryBatchCount { get; set; }
     }
 
     public class SalesTrendPointDto

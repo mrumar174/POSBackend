@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using POS.DTOs.Catalog;
 using POS.DTOs.Common;
 using POS.DTOs.Purchasing;
 using POS.Entities.Common;
 using POS.Entities.Data;
+using POS.Entities.Entities.Catalog;
 using POS.Entities.Inventory;
 using POS.Entities.IServices;
 using POS.Entities.Purchasing;
@@ -14,11 +16,16 @@ namespace POS.Entities.Services
     {
         private readonly ApplicationDbContext _db;
         private readonly ICurrentUserService _currentUser;
-
-        public PurchaseService(ApplicationDbContext db, ICurrentUserService currentUser)
+        private readonly IBatchService _batchService;
+        public PurchaseService(
+            ApplicationDbContext db, 
+            ICurrentUserService currentUser,
+            IBatchService batchService
+            )
         {
             _db = db;
             _currentUser = currentUser;
+            _batchService = batchService;
         }
 
         private IQueryable<PurchaseDto> ProjectToDto() =>
@@ -56,7 +63,11 @@ namespace POS.Entities.Services
                         DiscountValue = d.DiscountValue,
                         Discount = d.Discount,
                         Tax = d.Tax,
-                        Total = d.Total
+                        Total = d.Total,
+                        BatchId = d.BatchId,
+                        BatchNo = d.Batch != null ? d.Batch.BatchNo : null,
+                        ManufactureDate = d.Batch != null ? d.Batch.ManufactureDate : null,
+                        ExpiryDate = d.Batch != null ? d.Batch.ExpiryDate : null,
                     }).ToList()
                 });
 
@@ -83,6 +94,7 @@ namespace POS.Entities.Services
                 using var transaction = await _db.Database.BeginTransactionAsync();
                 try
                 {
+                    var batches = await ResolveBatchesAsync(dto.Items);
                     var purchase = new Purchase
                     {
                         InvoiceNo = invoiceNo,
@@ -97,11 +109,13 @@ namespace POS.Entities.Services
                         PaidAmount = dto.PaidAmount,
                         DueAmount = grandTotal - dto.PaidAmount,
                         PaymentMethodId = dto.PaymentMethodId,
-                        Remarks = dto.Remarks
+                        Remarks = dto.Remarks,
                     };
 
-                    foreach (var item in dto.Items)
+                    for (var i = 0; i < dto.Items.Count; i++)
                     {
+                        var item = dto.Items[i];
+
                         if (item.DiscountType == DiscountType.Percentage && item.DiscountValue > 100)
                             throw new InvalidOperationException("Percentage discount cannot exceed 100.");
 
@@ -111,6 +125,7 @@ namespace POS.Entities.Services
                         purchase.PurchaseDetails.Add(new PurchaseDetail
                         {
                             ProductId = item.ProductId,
+                            Batch = batches[i],
                             Quantity = item.Quantity,
                             PurchasePrice = item.PurchasePrice,
                             DiscountType = item.DiscountType,
@@ -147,7 +162,7 @@ namespace POS.Entities.Services
                     }
 
                     // Append Inventory changes
-                    AddStockTransactions(purchase, dto.Items);
+                    AddStockTransactions(purchase, dto.Items, batches);
 
                     await _db.SaveChangesAsync(); // Save 2: Commits Payments and Stock Transactions
                     await transaction.CommitAsync();
@@ -190,11 +205,16 @@ namespace POS.Entities.Services
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
+                var batches = await ResolveBatchesAsync(dto.Items);
+
                 // 1. Reverse old stock impact
                 var oldStockRows = await _db.StockTransactions
                     .Where(s => s.ReferenceType == "Purchase" && s.ReferenceId == purchase.Id)
                     .ToListAsync();
                 _db.StockTransactions.RemoveRange(oldStockRows);
+
+                var affectedBatchIds = oldStockRows
+                    .Where(s => s.BatchId.HasValue).Select(s => s.BatchId!.Value).ToList();
 
                 // 2. Clear old items
                 _db.PurchaseDetails.RemoveRange(purchase.PurchaseDetails);
@@ -235,7 +255,7 @@ namespace POS.Entities.Services
                         if (dto.PaymentMethodId.HasValue)
                             firstPayment.PaymentMethodId = dto.PaymentMethodId.Value;
 
-                        // Clean up any extra fragments if there were multiple payments 
+                        // Clean up any extra fragments if there were multiple payments
                         // so the total strictly matches the inline form
                         if (existingPayments.Count > 1)
                             _db.SupplierPayments.RemoveRange(existingPayments.Skip(1));
@@ -264,14 +284,16 @@ namespace POS.Entities.Services
                 }
 
                 // 5. Append new detail rows
-                foreach (var item in dto.Items)
+                for (var i = 0; i < dto.Items.Count; i++)
                 {
+                    var item = dto.Items[i];
                     var baseAmount = item.Quantity * item.PurchasePrice;
                     var itemDiscount = ComputeDiscountAmount(item.DiscountType, item.DiscountValue, baseAmount, item.Quantity);
 
                     purchase.PurchaseDetails.Add(new PurchaseDetail
                     {
                         ProductId = item.ProductId,
+                        Batch = batches[i],
                         Quantity = item.Quantity,
                         PurchasePrice = item.PurchasePrice,
                         DiscountType = item.DiscountType,
@@ -285,9 +307,14 @@ namespace POS.Entities.Services
                 await _db.SaveChangesAsync();
 
                 // 6. Re-apply stock
-                AddStockTransactions(purchase, dto.Items);
+                AddStockTransactions(purchase, dto.Items, batches);
 
                 await _db.SaveChangesAsync();
+
+                // NEW: block edits that would push an already-sold batch below zero
+                affectedBatchIds.AddRange(batches.Where(b => b != null).Select(b => b!.Id));
+                await _batchService.EnsureNoNegativeBatchStockAsync(affectedBatchIds);
+
                 await transaction.CommitAsync();
 
                 return await GetByIdAsync(purchase.Id)
@@ -326,11 +353,15 @@ namespace POS.Entities.Services
                     .ToListAsync();
 
                 _db.StockTransactions.RemoveRange(stockRows);
-                _db.SupplierPayments.RemoveRange(payments); // cascade soft-delete
+                _db.SupplierPayments.RemoveRange(payments);
                 _db.PurchaseDetails.RemoveRange(purchase.PurchaseDetails);
                 _db.Purchases.Remove(purchase);
 
                 await _db.SaveChangesAsync();
+
+                await _batchService.EnsureNoNegativeBatchStockAsync(
+                    stockRows.Where(s => s.BatchId.HasValue).Select(s => s.BatchId!.Value));
+
                 await transaction.CommitAsync();
             }
             catch
@@ -340,14 +371,14 @@ namespace POS.Entities.Services
             }
         }
 
-        private void AddStockTransactions(Purchase purchase, List<CreatePurchaseDetailDto> items)
+        private void AddStockTransactions(Purchase purchase, List<CreatePurchaseDetailDto> items, List<ProductBatch?> batches)
         {
-            var savedDetails = purchase.PurchaseDetails.ToList();
             for (int i = 0; i < items.Count; i++)
             {
                 _db.StockTransactions.Add(new StockTransaction
                 {
                     ProductId = items[i].ProductId,
+                    Batch = batches[i],
                     TransactionType = StockTransactionType.PURCHASE,
                     QuantityIn = items[i].Quantity,
                     QuantityOut = 0,
@@ -457,6 +488,27 @@ namespace POS.Entities.Services
                 DiscountType.Flat => discountValue,
                 _ => discountValue
             };
+        }
+        private async Task<List<ProductBatch?>> ResolveBatchesAsync(List<CreatePurchaseDetailDto> items)
+        {
+            var ids = items.Select(i => i.ProductId).Distinct().ToList();
+            var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+
+            var missing = ids.Where(id => !products.ContainsKey(id)).ToList();
+            if (missing.Count > 0)
+                throw new InvalidOperationException($"Product(s) not found: {string.Join(", ", missing)}.");
+
+            var result = new List<ProductBatch?>();
+            foreach (var item in items)
+            {
+                result.Add(await _batchService.GetOrCreateAsync(products[item.ProductId], new BatchInputDto
+                {
+                    BatchNo = item.BatchNo,
+                    ManufactureDate = item.ManufactureDate,
+                    ExpiryDate = item.ExpiryDate
+                }));
+            }
+            return result;   // same order/length as items
         }
         public async Task<List<PurchaseDto>> GetBySupplierAsync(int supplierId)
             => await ProjectToDto().Where(p => p.SupplierId == supplierId).OrderByDescending(p => p.PurchaseDate).ToListAsync();

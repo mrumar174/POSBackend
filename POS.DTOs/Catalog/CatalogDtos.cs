@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace POS.DTOs.Catalog
 {
     // ---------- Category ----------
@@ -76,6 +78,10 @@ namespace POS.DTOs.Catalog
         public decimal SalePrice { get; set; }
         public decimal MinimumStock { get; set; }
         public string? Description { get; set; }
+        public bool TrackBatch { get; set; }
+        public bool TrackExpiry { get; set; }
+        [Range(1, 3650)]
+        public int? ExpiryAlertDays { get; set; }
         public List<string> Barcodes { get; set; } = new();
     }
 
@@ -90,12 +96,17 @@ namespace POS.DTOs.Catalog
         public decimal SalePrice { get; set; }
         public decimal MinimumStock { get; set; }
         public string? Description { get; set; }
+        public bool TrackBatch { get; set; }
+        public bool TrackExpiry { get; set; }
+        [Range(1, 3650)]
+        public int? ExpiryAlertDays { get; set; }
         public List<string> Barcodes { get; set; } = new();
     }
 
     public class UpdateProductDto : CreateProductDto
     {
         public int Id { get; set; }
+
     }
 
     // ---------- ProductBarcode ----------
@@ -133,4 +144,35 @@ namespace POS.DTOs.Catalog
         public string? UnitShortName { get; set; }
         public List<string> Barcodes { get; set; } = new();
     }
+    
+    public class ProductBatchDto
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public string ProductCode { get; set; } = default!;
+        public string ProductName { get; set; } = default!;
+        public string UnitName { get; set; } = default!;
+        public string? BatchNo { get; set; }
+        public DateTime? ManufactureDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public decimal QuantityOnHand { get; set; }
+        public int? DaysToExpiry { get; set; }
+        public BatchExpiryStatus Status { get; set; }
+    }
+
+    /// <summary>Batch data entered on a purchase line.</summary>
+    public class BatchInputDto
+    {
+        [MaxLength(50)] public string? BatchNo { get; set; }
+        public DateTime? ManufactureDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+    }
+    public enum BatchExpiryStatus 
+    { 
+        Ok = 0, 
+        NearExpiry = 1, 
+        Expired = 2, 
+        NoExpiry = 3 
+    }
+
 }
